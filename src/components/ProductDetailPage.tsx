@@ -7,15 +7,22 @@ import {
 } from 'lucide-react';
 import { useAppContext, Product } from '../context/AppContext';
 import { translations } from '../translations';
+import { getPublicProductDetail, getSimilarProducts } from '../services/catalogueService';
+import { PageLoader } from './LoadingComponents';
+import { ProductCard } from './ProductSection';
 
 interface ProductDetailPageProps {
   productId: string;
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId }) => {
-  const { getProductById, addToCart, toggleWishlist, wishlist, language } = useAppContext();
+  const { addToCart, toggleWishlist, wishlist, language } = useAppContext();
   const t = translations[language];
-  const product = getProductById(productId);
+
+  const [product, setProduct] = React.useState<Product | null>(null);
+  const [similarProducts, setSimilarProducts] = React.useState<Product[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   const [activeImage, setActiveImage] = React.useState(0);
   const [selectedColor, setSelectedColor] = React.useState<string | null>(null);
@@ -25,16 +32,56 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
   const [showZoom, setShowZoom] = React.useState(false);
   const [addedNotice, setAddedNotice] = React.useState(false);
 
-  // Initialize selections
   React.useEffect(() => {
-    if (product?.variations?.colors) setSelectedColor(product.variations.colors[0].name);
-    if (product?.variations?.sizes) setSelectedSize(product.variations.sizes[2] || product.variations.sizes[0]);
-  }, [product]);
+    let cancelled = false;
+    const loadProduct = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const prod = await getPublicProductDetail(productId);
+        if (!cancelled) {
+          setProduct(prod);
+          setActiveImage(0);
+          if (prod.variants && prod.variants.length > 0) {
+            const firstInStock = prod.variants.find(v => v.isInStock) || prod.variants[0];
+            if (firstInStock.color) setSelectedColor(firstInStock.color);
+            if (firstInStock.size) setSelectedSize(firstInStock.size);
+          } else {
+            if (prod.variations?.colors?.[0]) setSelectedColor(prod.variations.colors[0].name);
+            if (prod.variations?.sizes?.[0]) setSelectedSize(prod.variations.sizes[0]);
+          }
+          
+          const similar = await getSimilarProducts(productId);
+          if (!cancelled) {
+            setSimilarProducts(similar);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setError('Impossible de charger les détails du produit.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
 
-  if (!product) {
+    loadProduct();
+    return () => {
+      cancelled = true;
+    };
+  }, [productId]);
+
+  if (loading) {
+    return <PageLoader message="Chargement du produit..." />;
+  }
+
+  if (error || !product) {
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
-        <h2 className="text-2xl font-display font-bold">{t.productNotFound}</h2>
+        <h2 className="text-2xl font-display font-bold">{error || t.productNotFound}</h2>
         <button onClick={() => window.location.hash = 'catalogue'} className="text-primary-blue font-bold hover:underline">
           {t.backToCatalog}
         </button>
@@ -44,15 +91,37 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
 
   const isInWishlist = wishlist.some(item => item.id === product.id);
 
+  const currentVariant = product.variants?.find(v => 
+    (selectedColor ? v.color === selectedColor : true) && 
+    (selectedSize ? v.size === selectedSize : true)
+  ) ?? (
+    // Fallback : produit sans couleur/taille → prendre la première variante dispo
+    product.variants && product.variants.length > 0 && !product.variations?.colors?.length && !product.variations?.sizes?.length
+      ? product.variants[0]
+      : undefined
+  );
+  
+  const displayStock = currentVariant ? currentVariant.stock : product.stock;
+  const isLowStock = currentVariant ? currentVariant.isLowStock : (displayStock > 0 && displayStock < 10);
+  const displayPrice = currentVariant?.effectivePrice || product.price;
+
   const handleAddToCart = () => {
     if (product.variations?.sizes && !selectedSize) return;
     setAddedNotice(true);
-    addToCart(product, quantity, { color: selectedColor || undefined, size: selectedSize || undefined });
+    addToCart(product, quantity, {
+      color: selectedColor || undefined,
+      size: selectedSize || undefined,
+      variantId: currentVariant?.id,
+    });
     setTimeout(() => setAddedNotice(false), 2000);
   };
 
   const handleBuyNow = () => {
-    addToCart(product, quantity, { color: selectedColor || undefined, size: selectedSize || undefined });
+    addToCart(product, quantity, {
+      color: selectedColor || undefined,
+      size: selectedSize || undefined,
+      variantId: currentVariant?.id,
+    });
     window.location.hash = 'checkout';
   };
 
@@ -146,18 +215,18 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
               {product.originalPrice ? (
                 <>
                   <span className="text-3xl md:text-4xl font-display font-black text-red-600">
-                    {product.price.toLocaleString()} FCFA
+                    {displayPrice.toLocaleString()} FCFA
                   </span>
                   <span className="text-lg text-medium-gray line-through">
                     {product.originalPrice.toLocaleString()} FCFA
                   </span>
                   <span className="px-2 py-1 bg-red-100 text-red-600 text-xs font-black rounded">
-                    -{Math.round((1 - product.price / product.originalPrice) * 100)}%
+                    -{Math.round((1 - displayPrice / product.originalPrice) * 100)}%
                   </span>
                 </>
               ) : (
                 <span className="text-3xl md:text-4xl font-display font-black text-primary-blue">
-                  {product.price.toLocaleString()} FCFA
+                  {displayPrice.toLocaleString()} FCFA
                 </span>
               )}
             </div>
@@ -165,56 +234,71 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
             {product.originalPrice && (
               <div className="flex items-center gap-2 text-primary-green font-bold text-sm">
                 <Zap className="w-4 h-4 fill-current" />
-                {t.youSave} {(product.originalPrice - product.price).toLocaleString()} FCFA
+                {t.youSave} {(product.originalPrice - displayPrice).toLocaleString()} FCFA
               </div>
             )}
 
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${product.stock > 0 ? 'bg-primary-green' : 'bg-red-500'} animate-pulse`} />
-              <span className={`text-sm font-bold ${product.stock > 0 ? 'text-primary-green' : 'text-red-500'}`}>
-                {product.stock > 0 ? `${t.inStock} (${product.stock} ${t.units})` : t.outOfStock}
+              <div className={`w-2 h-2 rounded-full ${displayStock > 0 ? 'bg-primary-green' : 'bg-red-500'} animate-pulse`} />
+              <span className={`text-sm font-bold ${displayStock > 0 ? 'text-primary-green' : 'text-red-500'}`}>
+                {displayStock > 0 ? `${t.inStock} (${displayStock} ${t.units})` : t.outOfStock}
               </span>
             </div>
           </div>
 
           {/* Variants */}
           <div className="space-y-6">
-            {product.variations?.colors && (
+            {product.variations?.colors && product.variations.colors.length > 0 && (
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-display font-bold text-dark-gray uppercase tracking-wider">{t.colorLabel} : <span className="text-medium-gray ml-2">{selectedColor}</span></span>
                 </div>
                 <div className="flex gap-3">
-                  {product.variations.colors.map(color => (
-                    <button
-                      key={color.name}
-                      onClick={() => setSelectedColor(color.name)}
-                      className={`w-10 h-10 rounded-full border-2 transition-all p-0.5 ${selectedColor === color.name ? 'border-primary-blue ring-2 ring-primary-blue/20' : 'border-transparent hover:border-light-gray'}`}
-                      title={color.name}
-                    >
-                      <div className="w-full h-full rounded-full border border-black/10" style={{ backgroundColor: color.hex }} />
-                    </button>
-                  ))}
+                  {product.variations.colors.map(color => {
+                    const hasStockInColor = product.variants?.some(v => v.color === color.name && v.isInStock) ?? true;
+                    return (
+                      <button
+                        key={color.name}
+                        onClick={() => {
+                          setSelectedColor(color.name);
+                          const firstAvailableSize = product.variants?.find(v => v.color === color.name && v.isInStock)?.size;
+                          if (firstAvailableSize) setSelectedSize(firstAvailableSize);
+                        }}
+                        className={`w-10 h-10 rounded-full border-2 transition-all p-0.5 ${selectedColor === color.name ? 'border-primary-blue ring-2 ring-primary-blue/20' : 'border-transparent hover:border-light-gray'} ${!hasStockInColor ? 'opacity-50 grayscale' : ''}`}
+                        title={color.name}
+                      >
+                        <div className="w-full h-full rounded-full border border-black/10" style={{ backgroundColor: color.hex }} />
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
-            {product.variations?.sizes && (
+            {product.variations?.sizes && product.variations.sizes.length > 0 && (
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-display font-bold text-dark-gray uppercase tracking-wider">{t.sizeLabel} : <span className="text-medium-gray ml-2">{selectedSize}</span></span>
                   <button className="text-xs text-primary-blue font-bold hover:underline">{t.sizeGuide}</button>
                 </div>
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                  {product.variations.sizes.map(size => (
-                    <button
-                      key={size}
-                      onClick={() => setSelectedSize(size)}
-                      className={`h-12 rounded-xl text-sm font-bold transition-all border-2 ${selectedSize === size ? 'bg-primary-blue border-primary-blue text-white shadow-lg' : 'bg-white border-light-gray text-dark-gray hover:border-primary-blue hover:text-primary-blue'}`}
-                    >
-                      {size}
-                    </button>
-                  ))}
+                  {product.variations.sizes.map(size => {
+                    const variant = product.variants?.find(v => v.size === size && v.color === selectedColor);
+                    const isInStock = variant ? variant.isInStock : true;
+                    
+                    return (
+                      <button
+                        key={size}
+                        onClick={() => isInStock && setSelectedSize(size)}
+                        disabled={!isInStock}
+                        className={`h-12 rounded-xl text-sm font-bold transition-all border-2 
+                          ${!isInStock ? 'bg-light-gray/20 text-light-gray border-transparent cursor-not-allowed line-through' :
+                            selectedSize === size ? 'bg-primary-blue border-primary-blue text-white shadow-lg' : 'bg-white border-light-gray text-dark-gray hover:border-primary-blue hover:text-primary-blue'}`}
+                      >
+                        {size}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -236,14 +320,15 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
                     className="w-12 bg-transparent text-center font-bold outline-none"
                   />
                   <button 
-                    onClick={() => setQuantity(prev => Math.min(product.stock, prev + 1))}
+                    onClick={() => setQuantity(prev => Math.min(displayStock, prev + 1))}
                     className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-lg transition-colors text-dark-gray"
+                    disabled={quantity >= displayStock}
                   >
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
-                {product.stock < 10 && product.stock > 0 && (
-                  <span className="text-xs text-orange-500 font-bold">{t.only} {product.stock} {t.itemsLeft}</span>
+                {isLowStock && (
+                  <span className="text-xs text-orange-500 font-bold">{t.only} {displayStock} {t.itemsLeft}</span>
                 )}
               </div>
             </div>
@@ -495,24 +580,15 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
       <div className="mt-20 space-y-10">
          <h2 className="text-2xl md:text-3xl font-display font-black text-dark-gray">{t.youMightAlsoLike}</h2>
          <div className="flex overflow-x-auto gap-6 pb-6 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-            {/* Using a simplified loop because real recs aren't here yet */}
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="min-w-[240px] md:min-w-[280px]">
-                {/* Product Card Placeholder */}
-                <div className="bg-white border border-light-gray rounded-2xl overflow-hidden group h-full flex flex-col">
-                   <div className="h-48 bg-light-gray p-4 flex items-center justify-center overflow-hidden">
-                     <img src={product.image} className="h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform" />
-                   </div>
-                   <div className="p-4 flex-1 flex flex-col justify-between">
-                      <div>
-                        <p className="text-[10px] text-medium-gray font-bold uppercase tracking-wider">{product.brand}</p>
-                        <h4 className="font-bold text-sm truncate">{product.name}</h4>
-                      </div>
-                      <p className="text-primary-blue font-bold text-lg mt-2">{product.price.toLocaleString()} FCFA</p>
-                   </div>
+            {similarProducts.length > 0 ? (
+              similarProducts.map((p) => (
+                <div key={p.id} className="min-w-[240px] md:min-w-[280px] snap-start shrink-0">
+                  <ProductCard product={p} />
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-medium-gray italic">{language === 'fr' ? 'Aucun produit similaire trouvé' : 'No similar products found'}</p>
+            )}
          </div>
       </div>
 

@@ -162,10 +162,10 @@ export const CategoryGrid = () => {
   const { language } = useAppContext();
 
   const CATEGORIES = [
-    { name: language === 'fr' ? 'HOMME' : 'MEN', count: 124, image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSCer20admfWblBk9dCsSSprT448KeqZkXpoA&s' },
-    { name: language === 'fr' ? 'FEMME' : 'WOMEN', count: 218, image: 'https://image.made-in-china.com/202f0j00kYvCAeQWEEbF/Summer-Black-New-Dress-Women-Fashion-Sexy-Evening-Dress.webp' },
-    { name: language === 'fr' ? 'CHAUSSURES' : 'SHOES', count: 86, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=600&auto=format&fit=crop' },
-    { name: language === 'fr' ? 'ELECTROMÉNAGER' : 'APPLIANCES', count: 42, image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=600&auto=format&fit=crop' }
+    { id: 'homme', name: language === 'fr' ? 'HOMME' : 'MEN', count: 124, image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSCer20admfWblBk9dCsSSprT448KeqZkXpoA&s' },
+    { id: 'femme', name: language === 'fr' ? 'FEMME' : 'WOMEN', count: 218, image: 'https://image.made-in-china.com/202f0j00kYvCAeQWEEbF/Summer-Black-New-Dress-Women-Fashion-Sexy-Evening-Dress.webp' },
+    { id: 'chaussures', name: language === 'fr' ? 'CHAUSSURES' : 'SHOES', count: 86, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=600&auto=format&fit=crop' },
+    { id: 'electromenager', name: language === 'fr' ? 'ELECTROMÉNAGER' : 'APPLIANCES', count: 42, image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=600&auto=format&fit=crop' }
   ];
 
   return (
@@ -182,7 +182,7 @@ export const CategoryGrid = () => {
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-6">
         <div className="grid grid-cols-2 gap-4 md:gap-6 col-span-2">
           {CATEGORIES.slice(0, 2).map((cat) => (
-            <CategoryCard key={cat.name} {...cat} />
+            <CategoryCard key={cat.id} {...cat} />
           ))}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-10 gap-4 md:gap-6 col-span-2">
@@ -198,10 +198,18 @@ export const CategoryGrid = () => {
   );
 };
 
-const CategoryCard = ({ name, count, image }: any) => {
+const CategoryCard = ({ id, name, count, image }: any) => {
   const { language } = useAppContext();
+  
+  const handleClick = () => {
+    window.location.hash = `catalogue?category=${id}`;
+  };
+
   return (
-    <div className="group relative overflow-hidden rounded-xl cursor-pointer bg-light-gray h-full min-h-[160px] md:min-h-[220px]">
+    <div 
+      onClick={handleClick}
+      className="group relative overflow-hidden rounded-xl cursor-pointer bg-light-gray h-full min-h-[160px] md:min-h-[220px]"
+    >
       <img
         src={image}
         alt={name}

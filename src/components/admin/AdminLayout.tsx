@@ -11,22 +11,26 @@ import { AdminReviews } from './AdminReviews';
 import { AdminContent } from './AdminContent';
 import { AdminSettings } from './AdminSettings';
 import { AdminLogin } from './AdminLogin';
+import { AdminCategories } from './AdminCategories';
 
 export const AdminLayout = () => {
   const { adminUser } = useAppContext();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
   
   // Hash-based sub-routing for admin
-  const [adminTab, setAdminTab] = React.useState(() => {
-    const hash = window.location.hash.split('?')[0].replace('#admin/', '');
-    return hash || 'dashboard';
-  });
+  const getTabFromHash = () => {
+    const full = window.location.hash.split('?')[0]; // e.g. '#admin/login'
+    if (full.startsWith('#admin/')) return full.slice('#admin/'.length) || 'dashboard';
+    if (full === '#admin') return 'dashboard';
+    return 'login'; // fallback safe default
+  };
+
+  const [adminTab, setAdminTab] = React.useState(getTabFromHash);
 
   React.useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.split('?')[0].replace('#admin/', '');
-      if (window.location.hash.startsWith('#admin/')) {
-        setAdminTab(hash || 'dashboard');
+      if (window.location.hash.startsWith('#admin')) {
+        setAdminTab(getTabFromHash());
       }
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -73,7 +77,7 @@ export const AdminLayout = () => {
       case 'content': return <AdminContent />;
       case 'settings': return <AdminSettings />;
       // Categories and Stocks share Catalog or have simplified views
-      case 'categories': return <div className="bg-white p-20 text-center rounded-3xl border border-dashed border-light-gray">Page de gestion des catégories (Détail Module 3.2)</div>;
+      case 'categories': return <AdminCategories />;
       case 'stocks': return <div className="bg-white p-20 text-center rounded-3xl border border-dashed border-light-gray">Page de suivi des stocks (Détail Module 3.3)</div>;
       default: return <AdminDashboard />;
     }

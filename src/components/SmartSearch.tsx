@@ -184,7 +184,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
                       key={p.id}
                       whileHover={{ x: 5 }}
                       onClick={() => {
-                        window.location.hash = `product/${p.id}`;
+                        window.location.hash = `produits/${p.slug || p.id}`;
                         setIsOpen(false);
                       }}
                       className="flex items-center gap-4 p-3 rounded-2xl hover:bg-primary-blue/5 cursor-pointer transition-all border border-transparent hover:border-primary-blue/10"

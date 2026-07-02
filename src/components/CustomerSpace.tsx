@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Package, User, MapPin, Heart, LogOut, ChevronRight, 
   ShoppingBag, Clock, CheckCircle2, Truck, Plus, Trash2,
-  Edit, Globe, Smartphone, ShieldCheck
+  Edit, Globe, Smartphone, ShieldCheck, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { useAppContext, Order, Address } from '../context/AppContext';
 import { translations } from '../translations';
+import { getMyOrderHistory, type OrderResponse } from '../services/catalogueService';
 
 export const CustomerSpace = () => {
   const { user, orders, addresses, wishlist, logout, toggleWishlist, removeAddress, addAddress, language } = useAppContext();
@@ -17,14 +18,46 @@ export const CustomerSpace = () => {
     return params.get('tab') || 'orders';
   });
   const [showAddressModal, setShowAddressModal] = React.useState(false);
+  
+  // Historique commandes depuis le backend
+  const [apiOrders, setApiOrders] = React.useState<OrderResponse[]>([]);
+  const [ordersLoading, setOrdersLoading] = React.useState(false);
+  const [ordersError, setOrdersError] = React.useState('');
   const [newAddress, setNewAddress] = React.useState({
     label: '',
-    name: user?.name || '',
-    phone: '',
+    name: user ? user.fullName : '',
+    phone: user?.phone || '',
     city: 'Douala',
     district: '',
     details: ''
   });
+
+  // Charger les commandes depuis le backend quand l'onglet est actif
+  React.useEffect(() => {
+    if (activeTab !== 'orders' || !user) return;
+    let cancelled = false;
+    const load = async () => {
+      setOrdersLoading(true);
+      setOrdersError('');
+      try {
+        const result = await getMyOrderHistory();
+        if (!cancelled) setApiOrders(result);
+      } catch (err: any) {
+        if (!cancelled) {
+          setOrdersError(
+            language === 'fr' 
+              ? 'Impossible de charger vos commandes. Veuillez réessayer.' 
+              : 'Unable to load your orders. Please try again.'
+          );
+        }
+      } finally {
+        if (!cancelled) setOrdersLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user]);
 
   React.useEffect(() => {
     const handleHashChange = () => {
@@ -62,12 +95,12 @@ export const CustomerSpace = () => {
             {/* User Info Card */}
             <div className="flex items-center gap-4 border-b border-light-gray pb-6">
               <div className="w-16 h-16 bg-gradient-to-tr from-primary-blue to-primary-green text-white rounded-2xl flex items-center justify-center font-black text-2xl shadow-lg">
-                {user.name.charAt(0)}
+                {user.firstName.charAt(0)}
               </div>
               <div className="overflow-hidden">
-                <h2 className="font-display font-black text-dark-gray truncate">{user.name}</h2>
-                <p className="text-sm text-medium-gray truncate">{user.email}</p>
-                <span className="text-[10px] font-black uppercase text-primary-green bg-green-50 px-2 py-0.5 rounded-full mt-1 inline-block">{t.premiumClient}</span>
+                <h2 className="font-display font-black text-dark-gray truncate">{user.fullName}</h2>
+                <p className="text-sm text-medium-gray truncate">{user.phone}</p>
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full mt-1 inline-block ${user.status === 'active' ? 'text-primary-green bg-green-50' : 'text-red-500 bg-red-50'}`}>{user.status === 'active' ? t.premiumClient : (language === 'fr' ? 'Suspendu' : 'Suspended')}</span>
               </div>
             </div>
 
@@ -100,7 +133,7 @@ export const CustomerSpace = () => {
             </nav>
 
             <button 
-              onClick={logout}
+              onClick={() => logout()}
               className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl font-bold text-red-500 hover:bg-red-50 transition-all text-left border-t border-light-gray pt-6"
             >
               <LogOut className="w-5 h-5" />
@@ -120,14 +153,34 @@ export const CustomerSpace = () => {
                 exit={{ opacity: 0, y: -20 }}
                 className="space-y-6"
               >
-                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center justify-between mb-8">
                   <h1 className="text-3xl font-display font-black text-dark-gray">{t.myOrdersTab}</h1>
                   <div className="flex gap-2">
-                    <span className="px-3 py-1 bg-light-gray text-medium-gray text-[10px] font-black rounded-full uppercase tracking-widest">{orders.length} {language === 'fr' ? 'total' : 'total'}</span>
+                    <span className="px-3 py-1 bg-light-gray text-medium-gray text-[10px] font-black rounded-full uppercase tracking-widest">
+                      {apiOrders.length} {language === 'fr' ? 'total' : 'total'}
+                    </span>
                   </div>
                 </div>
 
-                {orders.length === 0 ? (
+                {ordersLoading ? (
+                  <div className="bg-white rounded-3xl border border-light-gray py-20 flex flex-col items-center gap-4">
+                    <RefreshCw className="w-10 h-10 text-primary-blue animate-spin" />
+                    <p className="text-medium-gray font-medium">
+                      {language === 'fr' ? 'Chargement de vos commandes...' : 'Loading your orders...'}
+                    </p>
+                  </div>
+                ) : ordersError ? (
+                  <div className="bg-red-50 rounded-3xl border border-red-200 py-12 flex flex-col items-center gap-4 text-center px-6">
+                    <AlertCircle className="w-10 h-10 text-red-400" />
+                    <p className="text-red-600 font-medium">{ordersError}</p>
+                    <button
+                      onClick={() => setActiveTab('_reload_orders')}
+                      className="px-6 h-10 bg-primary-blue text-white rounded-xl font-bold text-sm hover:brightness-110"
+                    >
+                      {language === 'fr' ? 'Réessayer' : 'Retry'}
+                    </button>
+                  </div>
+                ) : apiOrders.length === 0 ? (
                   <div className="bg-white rounded-3xl border border-dashed border-light-gray py-20 text-center space-y-6">
                     <Package className="w-20 h-20 text-light-gray mx-auto" />
                     <div className="space-y-2">
@@ -143,8 +196,8 @@ export const CustomerSpace = () => {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {orders.map(order => (
-                      <OrderCard key={order.id} order={order} />
+                    {apiOrders.map(order => (
+                      <ApiOrderCard key={order.id} order={order} />
                     ))}
                   </div>
                 )}
@@ -171,9 +224,9 @@ export const CustomerSpace = () => {
                     </div>
 
                     <div className="space-y-4">
-                      <InfoGroup label={t.fullName} value={user.name} />
-                      <InfoGroup label={t.emailAddress} value={user.email} />
-                      <InfoGroup label={t.phone} value={t.notProvided} />
+                      <InfoGroup label={t.fullName} value={user.fullName} />
+                      <InfoGroup label={t.phoneLabel} value={user.phone} />
+                      <InfoGroup label={language === 'fr' ? 'Ville' : 'City'} value={user.city ?? (language === 'fr' ? 'Non renseignée' : 'Not provided')} />
                     </div>
                   </div>
 
@@ -245,7 +298,7 @@ export const CustomerSpace = () => {
                             <div className="mt-auto flex items-center justify-between">
                                <p className="font-display font-black text-primary-blue">{product.price.toLocaleString()} F</p>
                                <button 
-                                 onClick={() => window.location.hash = `product/${product.id}`}
+                                 onClick={() => window.location.hash = `produits/${product.slug || product.id}`}
                                  className="text-[10px] font-black uppercase text-primary-blue hover:underline"
                                >
                                  {language === 'fr' ? 'Voir' : 'View'}
@@ -340,7 +393,7 @@ export const CustomerSpace = () => {
                   e.preventDefault();
                   addAddress(newAddress);
                   setShowAddressModal(false);
-                  setNewAddress({ label: '', name: user.name, phone: '', city: 'Douala', district: '', details: '' });
+                  setNewAddress({ label: '', name: user.fullName, phone: user.phone, city: 'Douala', district: '', details: '' });
                 }} 
                 className="space-y-6"
               >
@@ -546,3 +599,189 @@ const InfoGroup = ({ label, value }: { label: string, value: string }) => (
     <p className="font-bold text-dark-gray">{value}</p>
   </div>
 );
+
+// ─── Composant commande backend ───────────────────────────────────────────────
+
+const ApiOrderCard: React.FC<{ order: OrderResponse }> = ({ order }) => {
+  const { language } = useAppContext();
+  const t = translations[language];
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'confirmed': case 'processing': return 'bg-green-50 text-primary-green border-green-200';
+      case 'shipped': case 'delivered': return 'bg-blue-50 text-primary-blue border-blue-200';
+      case 'payment_failed': case 'cancelled': return 'bg-red-50 text-red-500 border-red-200';
+      default: return 'bg-orange-50 text-orange-600 border-orange-200';
+    }
+  };
+
+  const getIconBg = (status: string) => {
+    switch (status) {
+      case 'confirmed': case 'processing': case 'delivered': return 'bg-green-50 text-primary-green';
+      case 'shipped': return 'bg-blue-50 text-primary-blue';
+      case 'payment_failed': case 'cancelled': return 'bg-red-50 text-red-500';
+      default: return 'bg-orange-50 text-orange-600';
+    }
+  };
+
+  const createdDate = new Date(order.createdAt).toLocaleDateString(
+    language === 'fr' ? 'fr-FR' : 'en-US',
+    { year: 'numeric', month: 'long', day: 'numeric' }
+  );
+
+  // Timeline : quels étapes sont actives selon le statut
+  const statusOrder = ['pending_payment', 'pending_cod', 'confirmed', 'processing', 'shipped', 'delivered'];
+  const currentIdx = statusOrder.indexOf(order.status);
+  const isAfter = (status: string) => currentIdx >= statusOrder.indexOf(status);
+
+  return (
+    <div className="bg-white rounded-3xl border border-light-gray overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+      <div className="p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${getIconBg(order.status)}`}>
+            <Package className="w-8 h-8" />
+          </div>
+          <div>
+            <h4 className="font-display font-black text-xl text-dark-gray italic uppercase tracking-tighter">
+              #{order.orderNumber}
+            </h4>
+            <p className="text-sm text-medium-gray font-medium flex items-center gap-2">
+              <Clock className="w-4 h-4" /> {createdDate}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="text-right">
+            <p className="text-2xl font-display font-black text-primary-blue italic">
+              {order.totalAmount.toLocaleString()} FCFA
+            </p>
+            <div className="flex items-center justify-end gap-2 mt-1">
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${getStatusStyle(order.status)}`}>
+                {order.statusLabel}
+              </span>
+              <span className="text-[10px] font-bold text-medium-gray">
+                {order.items.length} {language === 'fr' ? 'articles' : 'items'}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isOpen ? 'bg-dark-gray text-white rotate-180' : 'bg-light-gray text-dark-gray'}`}
+          >
+            <ChevronRight className="w-5 h-5 -rotate-90" />
+          </button>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-light-gray overflow-hidden"
+          >
+            <div className="p-6 md:p-8 space-y-8 bg-light-gray/10">
+              {/* Timeline */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative md:px-12">
+                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-light-gray -translate-y-1/2 z-0 hidden md:block" />
+                <StatusPoint active={true} icon={<CheckCircle2 className="w-5 h-5" />} label={t.orderStatus.confirmed} sub={language === 'fr' ? 'Commande créée' : 'Order created'} />
+                <StatusPoint active={isAfter('confirmed')} icon={<ShoppingBag className="w-5 h-5" />} label={t.orderStatus.preparation} sub={isAfter('processing') ? (language === 'fr' ? 'Terminé' : 'Done') : (language === 'fr' ? 'À venir' : 'Upcoming')} />
+                <StatusPoint active={isAfter('shipped')} icon={<Truck className="w-5 h-5" />} label={t.orderStatus.shipped} sub={order.status === 'shipped' ? (language === 'fr' ? 'En cours' : 'In progress') : (language === 'fr' ? 'À venir' : 'Upcoming')} />
+                <StatusPoint active={order.status === 'delivered'} icon={<CheckCircle2 className="w-5 h-5" />} label={t.orderStatus.deliveredPoint} sub={order.status === 'delivered' ? (language === 'fr' ? 'Effectué' : 'Completed') : (language === 'fr' ? 'À venir' : 'Upcoming')} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+                {/* Articles */}
+                <div className="space-y-4">
+                  <h5 className="font-black uppercase tracking-widest text-[11px] text-medium-gray italic">
+                    {language === 'fr' ? 'Articles de la commande' : 'Order Items'}
+                  </h5>
+                  <div className="space-y-3">
+                    {order.items.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-light-gray/50">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} className="w-12 h-12 rounded-lg object-cover" alt={item.productName} />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-light-gray flex items-center justify-center shrink-0">
+                            <Package className="w-6 h-6 text-medium-gray" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-dark-gray truncate">{item.productName}</p>
+                          <p className="text-[10px] text-medium-gray font-bold">
+                            {language === 'fr' ? 'Qté:' : 'Qty:'} {item.quantity}
+                            {item.variantLabel ? ` | ${item.variantLabel}` : ''}
+                          </p>
+                        </div>
+                        <p className="font-black text-primary-blue whitespace-nowrap">{item.subtotal.toLocaleString()} F</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Infos livraison + totaux */}
+                <div className="space-y-6">
+                  {order.deliveryAddress && (
+                    <div className="space-y-4">
+                      <h5 className="font-black uppercase tracking-widest text-[11px] text-medium-gray italic">
+                        {language === 'fr' ? 'Informations de livraison' : 'Delivery Information'}
+                      </h5>
+                      <div className="bg-white p-4 rounded-2xl border border-light-gray/50 space-y-2">
+                        <p className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-primary-blue shrink-0" />
+                          <span className="font-bold">{order.deliveryAddress.fullName}</span>
+                        </p>
+                        <p className="text-medium-gray text-xs pl-6">{order.deliveryAddress.formatted}</p>
+                        <p className="text-medium-gray text-xs pl-6">{order.deliveryAddress.phone}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Récap financier */}
+                  <div className="bg-white p-4 rounded-2xl border border-light-gray/50 space-y-2 text-xs">
+                    <div className="flex justify-between text-medium-gray">
+                      <span>{language === 'fr' ? 'Sous-total' : 'Subtotal'}</span>
+                      <span>{order.itemsTotal.toLocaleString()} FCFA</span>
+                    </div>
+                    <div className="flex justify-between text-medium-gray">
+                      <span>{language === 'fr' ? 'Livraison' : 'Delivery'}</span>
+                      <span>{order.deliveryFee.toLocaleString()} FCFA</span>
+                    </div>
+                    {order.paymentFee > 0 && (
+                      <div className="flex justify-between text-medium-gray">
+                        <span>{language === 'fr' ? 'Frais mobile' : 'Mobile fee'}</span>
+                        <span>{order.paymentFee.toLocaleString()} FCFA</span>
+                      </div>
+                    )}
+                    {order.discountAmount > 0 && (
+                      <div className="flex justify-between text-primary-green">
+                        <span>{language === 'fr' ? 'Réduction' : 'Discount'}</span>
+                        <span>-{order.discountAmount.toLocaleString()} FCFA</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-black pt-2 border-t border-light-gray">
+                      <span className="text-dark-gray">{language === 'fr' ? 'Total' : 'Total'}</span>
+                      <span className="text-primary-blue">{order.totalAmount.toLocaleString()} FCFA</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button className="flex-1 h-12 bg-white border border-light-gray text-dark-gray rounded-xl font-bold hover:bg-light-gray transition-colors text-xs">
+                      {language === 'fr' ? 'Aide commande' : 'Order help'}
+                    </button>
+                    <button className="flex-1 h-12 bg-white border border-light-gray text-dark-gray rounded-xl font-bold hover:bg-light-gray transition-colors text-xs">
+                      {language === 'fr' ? 'Suivre le livreur' : 'Track delivery'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};

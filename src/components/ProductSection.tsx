@@ -22,7 +22,7 @@ export const ProductCard: React.FC<{
     <div 
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={() => window.location.hash = `product/${product.id}`}
+      onClick={() => window.location.hash = `produits/${product.slug || product.id}`}
       className="w-full bg-white rounded-2xl shadow-sm hover:shadow-2xl hover:-translate-y-1 cursor-pointer transition-all duration-500 group border border-gray-100 flex flex-col h-full overflow-hidden"
     >
       {/* Image Container */}

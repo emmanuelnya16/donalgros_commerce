@@ -5,18 +5,14 @@ import { useAppContext, Product } from '../context/AppContext';
 import { ProductCard } from './ProductSection';
 import { SmartSearch } from './SmartSearch';
 import { translations } from '../translations';
+import { getPublicProducts } from '../services/catalogueService';
 
-const CATEGORIES = [
-  { id: 'homme', title: 'HOMME', count: 124, image: 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?q=80&w=1200&auto=format&fit=crop', width: 'lg:w-[55%]' },
-  { id: 'femme', title: 'FEMME', count: 98, image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1200&auto=format&fit=crop', width: 'lg:w-[45%]' },
-  { id: 'chaussures', title: 'CHAUSSURES', count: 156, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1200&auto=format&fit=crop', width: 'lg:w-[40%]' },
-  { id: 'electromenager', title: 'ELECTROMENAGER', count: 85, image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?q=80&w=1200&auto=format&fit=crop', width: 'lg:w-[60%]' },
-];
+
 
 const QUICK_TAGS = ['Chemises homme', 'Robes été', 'Nike Air', 'Réfrigérateur', 'Jeans', 'Sneakers', 'Pantalons', 'Vibrato'];
 
 export const CataloguePage = () => {
-  const { toggleWishlist, wishlist, products: MOCK_ALL_PRODUCTS, addToCart, language } = useAppContext();
+  const { toggleWishlist, wishlist, addToCart, language, categories } = useAppContext();
   const t = translations[language];
   
   // Read initial states from URL
@@ -29,9 +25,15 @@ export const CataloguePage = () => {
     return params.get('q') || '';
   });
 
+  const [dbProducts, setDbProducts] = React.useState<Product[]>([]);
+  const [totalProducts, setTotalProducts] = React.useState(0);
+  const [totalPages, setTotalPages] = React.useState(1);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [loading, setLoading] = React.useState(false);
+
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [isMobileFilterOpen, setIsMobileFilterOpen] = React.useState(false);
-  const [priceRange, setPriceRange] = React.useState([0, 500000]);
+  const [priceRange, setPriceRange] = React.useState([0, 1500000]);
   const [compareItems, setCompareItems] = React.useState<string[]>([]);
   const [sortBy, setSortBy] = React.useState('pertinence');
   const [activeTab, setActiveTab] = React.useState(language === 'fr' ? 'Tous' : 'All');
@@ -53,38 +55,59 @@ export const CataloguePage = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Sync category, search, sortBy and pagination to backend API
+  React.useEffect(() => {
+    let active = true;
+    const fetchFiltered = async () => {
+      setLoading(true);
+      try {
+        const mappedSort = 
+          sortBy === 'prix-croissant' || sortBy === 'price-asc' ? 'price-asc' :
+          sortBy === 'prix-decroissant' || sortBy === 'price-desc' ? 'price-desc' :
+          sortBy === 'nouveautes' || sortBy === 'newest' ? 'newest' : undefined;
+
+        const data = await getPublicProducts({
+          categorySlug: selectedCategory || undefined,
+          search: searchQuery || undefined,
+          sortBy: mappedSort,
+          page: currentPage,
+          limit: 12
+        });
+
+        if (active) {
+          setDbProducts(data.products);
+          setTotalProducts(data.total);
+          setTotalPages(data.totalPages);
+        }
+      } catch (err) {
+        console.error('Erreur de chargement des produits du catalogue:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchFiltered();
+    return () => { active = false; };
+  }, [selectedCategory, searchQuery, sortBy, currentPage]);
+
   const filteredProducts = React.useMemo(() => {
-    let result = MOCK_ALL_PRODUCTS.filter(p => {
-      // Category filter (if not in catalog overview)
-      if (selectedCategory && p.category !== selectedCategory) return false;
-      
-      // Price filter
+    let result = [...dbProducts];
+
+    // Local filters for faster feedback on price range & brands
+    result = result.filter(p => {
       if (p.price > priceRange[1]) return false;
-      
-      // Search filter
-      if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase()) && !p.brand.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      
-      // Brand filter
       if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand)) return false;
 
-      // Tab filters (Sub-nav)
       const isAll = activeTab === 'Tous' || activeTab === 'All';
       if (!isAll) {
-        if ((activeTab === 'Nouveautés' || activeTab === 'New') && p.id !== 'c1') return false; 
-        if ((activeTab === 'Premium') && p.price < 50000) return false;
+        if ((activeTab === 'Nouveautés' || activeTab === 'New') && p.badge !== 'NOUVEAU' && p.badge !== 'NEW') return false; 
+        if ((activeTab === 'Premium') && p.price < 100000) return false;
         if ((activeTab === 'Soldes' || activeTab === 'Sale' || activeTab === 'Deals') && !p.originalPrice) return false;
       }
-
       return true;
     });
 
-    // Sorting
-    if (sortBy === 'prix-croissant' || sortBy === 'price-asc') result.sort((a, b) => a.price - b.price);
-    if (sortBy === 'prix-decroissant' || sortBy === 'price-desc') result.sort((a, b) => b.price - a.price);
-    if (sortBy === 'nouveautes' || sortBy === 'newest') result.sort((a, b) => b.id.localeCompare(a.id));
-
     return result;
-  }, [selectedCategory, priceRange, searchQuery, selectedBrands, sortBy, activeTab, MOCK_ALL_PRODUCTS]);
+  }, [dbProducts, priceRange, selectedBrands, activeTab]);
 
   const toggleBrand = (brand: string) => {
     setSelectedBrands(prev => prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]);
@@ -96,11 +119,37 @@ export const CataloguePage = () => {
     );
   };
 
-  const handleCategoryClick = (id: string) => {
+  const handleCategoryClick = (id: string | null) => {
     setSelectedCategory(id);
-    setSearchQuery(''); // Clear search when picking explicit category
+    setSearchQuery('');
+    setCurrentPage(1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const currentCategoryObj = React.useMemo(() => {
+    return categories.find(c => c.slug === selectedCategory || c.id === selectedCategory || c.name.toLowerCase() === selectedCategory?.toLowerCase());
+  }, [categories, selectedCategory]);
+
+  const { rootCategory, subCategories } = React.useMemo(() => {
+    let root: any = null;
+    let subs: any[] = [];
+
+    if (currentCategoryObj) {
+      if (!currentCategoryObj.parentId) {
+        // It's a root category
+        root = currentCategoryObj;
+        subs = categories.filter(c => c.parentId === root.id);
+      } else {
+        // It's a subcategory
+        root = categories.find(c => c.id === currentCategoryObj.parentId) || null;
+        subs = categories.filter(c => c.parentId === currentCategoryObj.parentId);
+      }
+    } else {
+      // No category selected, show root categories
+      subs = categories.filter(c => !c.parentId);
+    }
+    return { rootCategory: root, subCategories: subs };
+  }, [categories, currentCategoryObj]);
 
   if (!selectedCategory && !searchQuery) {
     return (
@@ -115,30 +164,35 @@ export const CataloguePage = () => {
         <h1 className="text-3xl md:text-4xl font-display font-black text-dark-gray mb-2">{t.ourCatalog}</h1>
         <p className="text-medium-gray mb-10">{t.discoverSelection}</p>
 
-        {/* Asymmetric Categories Grid */}
-        <div className="flex flex-col gap-4 mb-12">
-          <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[300px]">
-             <CategoryCard cat={CATEGORIES[0]} onClick={() => handleCategoryClick(CATEGORIES[0].id)} className="lg:w-[55%]" />
-             <CategoryCard cat={CATEGORIES[1]} onClick={() => handleCategoryClick(CATEGORIES[1].id)} className="lg:w-[45%]" />
-          </div>
-          <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[260px]">
-             <CategoryCard cat={CATEGORIES[2]} onClick={() => handleCategoryClick(CATEGORIES[2].id)} className="lg:w-[40%]" />
-             <CategoryCard cat={CATEGORIES[3]} onClick={() => handleCategoryClick(CATEGORIES[3].id)} className="lg:w-[60%]" />
-          </div>
+        {/* Symmetric Categories Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 mb-12">
+          {(() => {
+            const displayCats = categories.filter(c => !c.parentId).map((cat) => {
+                  return {
+                    id: cat.slug || cat.id,
+                    title: cat.name.toUpperCase(),
+                    count: cat.productCount,
+                  };
+                });
+
+            return displayCats.map(c => (
+              <CategoryCard key={c.id} cat={c} onClick={() => handleCategoryClick(c.id)} />
+            ));
+          })()}
         </div>
 
         {/* Big Search Bar */}
         <div className="mb-12">
             <SmartSearch 
               initialValue={searchQuery}
-              onSearch={(q) => setSearchQuery(q)}
+              onSearch={(q) => { setSearchQuery(q); setCurrentPage(1); }}
               placeholder={t.searchCatalog}
               className="mb-4"
             />
            {/* Quick Tags */}
            <div className="flex flex-wrap gap-2 mt-4 overflow-x-auto pb-2 no-scrollbar">
               {QUICK_TAGS.map(tag => (
-                <button key={tag} className="px-4 py-1.5 bg-light-gray/50 hover:bg-primary-blue/10 text-dark-gray rounded-full text-xs font-medium transition-colors shrink-0">
+                <button key={tag} onClick={() => { setSearchQuery(tag); setCurrentPage(1); }} className="px-4 py-1.5 bg-light-gray/50 hover:bg-primary-blue/10 text-dark-gray rounded-full text-xs font-medium transition-colors shrink-0">
                   {tag}
                 </button>
               ))}
@@ -148,7 +202,6 @@ export const CataloguePage = () => {
     );
   }
 
-  // Category view (Product Listing)
   return (
     <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-8 relative">
       {/* Compare Floating Bar */}
@@ -163,7 +216,7 @@ export const CataloguePage = () => {
              <div className="flex -space-x-4">
                 {compareItems.map(id => (
                    <div key={id} className="w-12 h-12 rounded-full border-2 border-white overflow-hidden bg-light-gray relative group">
-                      <img src={MOCK_ALL_PRODUCTS.find(p => p.id === id)?.image} className="w-full h-full object-cover" alt="" />
+                      <img src={dbProducts.find(p => p.id === id)?.image} className="w-full h-full object-cover" alt="" />
                       <button 
                         onClick={() => toggleCompare(id)}
                         className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -197,17 +250,12 @@ export const CataloguePage = () => {
         </div>
         
         {selectedCategory && (
-          <div className="relative h-20 md:h-32 rounded-2xl overflow-hidden mb-6 group">
-             <img 
-               src={CATEGORIES.find(c => c.id === selectedCategory)?.image} 
-               className="w-full h-full object-cover brightness-50 group-hover:scale-105 transition-transform duration-700" 
-               alt=""
-             />
-             <div className="absolute inset-0 flex items-center justify-between px-8">
-                <div>
-                  <h1 className="text-2xl md:text-4xl font-display font-black text-white uppercase">{selectedCategory}</h1>
-                  <p className="text-white/70 text-xs md:text-sm">{CATEGORIES.find(c => c.id === selectedCategory)?.count} {language === 'fr' ? 'produits disponibles' : 'products available'}</p>
-                </div>
+          <div className="relative p-8 md:p-10 rounded-3xl overflow-hidden mb-6 group bg-primary-blue flex flex-col justify-center items-start shadow-xl">
+             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+             <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary-green/20 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4" />
+             <div className="relative z-10">
+                <h1 className="text-3xl md:text-5xl font-display font-black text-white uppercase tracking-tight">{currentCategoryObj?.name || selectedCategory}</h1>
+                <p className="text-white/80 text-sm md:text-base mt-2 font-medium">{totalProducts} {language === 'fr' ? 'produits disponibles' : 'products available'}</p>
              </div>
           </div>
         )}
@@ -215,7 +263,7 @@ export const CataloguePage = () => {
         {!selectedCategory && searchQuery && (
            <div className="mb-8 p-8 bg-primary-blue/5 rounded-2xl border-2 border-dashed border-primary-blue/20">
               <h1 className="text-2xl font-display font-black text-dark-gray">{t.resultsFor} : <span className="text-primary-blue">"{searchQuery}"</span></h1>
-              <p className="text-medium-gray">{t.matchFound} {filteredProducts.length} {t.productsFoundShort}</p>
+              <p className="text-medium-gray">{t.matchFound} {totalProducts} {t.productsFoundShort}</p>
               <button 
                 onClick={() => setSearchQuery('')}
                 className="mt-2 text-sm text-primary-blue font-bold flex items-center gap-1 hover:underline"
@@ -225,18 +273,18 @@ export const CataloguePage = () => {
            </div>
         )}
 
-        {/* Global Search bar (always visible in listing) */}
+        {/* Global Search bar */}
         <div className="mb-6 max-w-2xl">
            <SmartSearch 
              initialValue={searchQuery}
-             onSearch={(q) => setSearchQuery(q)}
+             onSearch={(q) => { setSearchQuery(q); setCurrentPage(1); }}
              placeholder={t.refineSearch}
            />
         </div>
 
         {/* Sub-nav pills */}
         <div className="flex overflow-x-auto gap-2 pb-4 no-scrollbar">
-           {(language === 'fr' ? ['Tous', 'Nouveautés', 'Premium', 'Soldes', 'Tendances'] : ['All', 'Newest', 'Premium', 'Sale', 'Trends']).map((pill) => (
+           {(language === 'fr' ? ['Tous', 'Nouveautés', 'Premium', 'Soldes'] : ['All', 'Newest', 'Premium', 'Sale']).map((pill) => (
              <button 
                 key={pill} 
                 onClick={() => setActiveTab(pill)}
@@ -255,16 +303,69 @@ export const CataloguePage = () => {
               <h3 className="font-display font-bold text-lg">{t.filters}</h3>
               <button 
                 onClick={() => {
-                  setPriceRange([0, 500000]);
+                  setPriceRange([0, 1500000]);
                   setSelectedBrands([]);
                   setSearchQuery('');
                   setActiveTab(language === 'fr' ? 'Tous' : 'All');
+                  setSelectedCategory(null);
                 }}
                 className="text-xs text-red-500 font-bold hover:underline"
               >
                 {t.reset}
               </button>
            </div>
+
+           {/* Category Section */}
+           <FilterSection title={language === 'fr' ? "CATEGORIES" : "CATEGORIES"}>
+              <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                 {!rootCategory ? (
+                   // Show all root categories
+                   subCategories.map(cat => (
+                     <button 
+                       key={cat.id}
+                       onClick={() => handleCategoryClick(cat.slug || cat.id)}
+                       className="w-full text-left text-sm py-2 px-3 rounded-xl font-bold transition-all capitalize text-medium-gray hover:bg-light-gray hover:text-primary-blue flex items-center justify-between group"
+                     >
+                       {cat.name}
+                       <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                     </button>
+                   ))
+                 ) : (
+                   // Show root category context and its subcategories
+                   <>
+                     <button 
+                       onClick={() => handleCategoryClick(null)}
+                       className="w-full text-left text-xs py-2 px-3 rounded-lg font-bold transition-all text-medium-gray hover:bg-light-gray flex items-center gap-1 mb-2"
+                     >
+                       <ChevronRight className="w-3 h-3 rotate-180" /> {language === 'fr' ? 'Toutes les catégories' : 'All Categories'}
+                     </button>
+                     
+                     <button 
+                       onClick={() => handleCategoryClick(rootCategory.slug || rootCategory.id)}
+                       className={`w-full text-left text-sm py-2 px-3 rounded-xl font-black transition-all capitalize mb-2 ${selectedCategory === rootCategory.slug || selectedCategory === rootCategory.id || selectedCategory?.toLowerCase() === rootCategory.name.toLowerCase() ? 'bg-primary-blue text-white shadow-md' : 'bg-light-gray text-dark-gray hover:bg-primary-blue/10'}`}
+                     >
+                       {rootCategory.name} {language === 'fr' ? '(Tout)' : '(All)'}
+                     </button>
+                     
+                     <div className="pl-2 space-y-1 border-l-2 border-light-gray ml-2">
+                       {subCategories.map(sub => {
+                         const isActive = selectedCategory === sub.slug || selectedCategory === sub.id || selectedCategory?.toLowerCase() === sub.name.toLowerCase();
+                         return (
+                           <button 
+                             key={sub.id}
+                             onClick={() => handleCategoryClick(sub.slug || sub.id)}
+                             className={`w-full text-left text-sm py-1.5 px-3 rounded-lg font-bold transition-all capitalize flex items-center gap-2 ${isActive ? 'text-primary-blue bg-primary-blue/5' : 'text-medium-gray hover:text-dark-gray hover:bg-light-gray/50'}`}
+                           >
+                             <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActive ? 'bg-primary-blue' : 'bg-transparent border border-medium-gray'}`} />
+                             {sub.name}
+                           </button>
+                         )
+                       })}
+                     </div>
+                   </>
+                 )}
+              </div>
+           </FilterSection>
            
            {/* Price Section */}
            <FilterSection title={t.price}>
@@ -272,9 +373,10 @@ export const CataloguePage = () => {
                  <input 
                    type="range" 
                    min="0" 
-                   max="500000" 
-                   step="1000"
+                   max="1500000" 
+                   step="10000"
                    className="w-full accent-primary-blue"
+                   value={priceRange[1]}
                    onChange={(e) => setPriceRange([0, parseInt(e.target.value)])}
                  />
                  <div className="flex justify-between mt-2 text-xs font-bold text-medium-gray">
@@ -359,7 +461,9 @@ export const CataloguePage = () => {
           </div>
 
           {/* Product Grid/List */}
-          {viewMode === 'grid' ? (
+          {loading ? (
+            <div className="py-20 text-center text-medium-gray font-bold animate-pulse">Chargement des produits...</div>
+          ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6 lg:gap-10 xl:gap-12">
               {filteredProducts.map(p => (
                 <ProductCard 
@@ -375,9 +479,10 @@ export const CataloguePage = () => {
                    <button 
                      onClick={() => {
                         setSelectedBrands([]);
-                        setPriceRange([0, 500000]);
+                        setPriceRange([0, 1500000]);
                         setSearchQuery('');
                         setActiveTab(language === 'fr' ? 'Tous' : 'All');
+                        setSelectedCategory(null);
                      }} 
                      className="mt-4 text-primary-blue font-bold hover:underline"
                    >
@@ -403,7 +508,6 @@ export const CataloguePage = () => {
                           {p.badge}
                         </span>
                       )}
-                      {/* Comparison Checkbox in List View */}
                       <div className="absolute top-2 right-2 flex flex-col gap-2">
                          <input 
                            type="checkbox" 
@@ -431,7 +535,7 @@ export const CataloguePage = () => {
                            </div>
                            <span className="text-xs text-medium-gray">({p.reviewsCount} avis)</span>
                         </div>
-                        <p className="text-sm text-medium-gray line-clamp-2 max-w-md">{language === 'fr' ? 'Une description détaillée du produit qui met en avant ses caractéristiques principales et son style exceptionnel.' : 'A detailed description of the product that highlights its main characteristics and exceptional style.'}</p>
+                        <p className="text-sm text-medium-gray line-clamp-2 max-w-md">{p.description}</p>
                      </div>
                      <div className="md:w-48 flex flex-col justify-between items-end border-t md:border-t-0 md:border-l border-light-gray pt-4 md:pt-0 md:pl-6">
                         <div className="text-right">
@@ -449,37 +553,41 @@ export const CataloguePage = () => {
                              onClick={(e) => { e.stopPropagation(); addToCart(p); }}
                              className="w-full h-11 bg-primary-blue text-white font-bold rounded-lg hover:bg-dark-gray transition-colors"
                            >
-                            {t.addToCart}
-                           </button>
-                           <button 
-                             onClick={() => window.location.hash = `product/${p.id}`}
-                             className="w-full h-11 border border-primary-blue text-primary-blue font-bold rounded-lg hover:bg-primary-blue hover:text-white transition-all"
-                           >
-                            {language === 'fr' ? 'Détails' : 'Details'}
+                             Ajouter au panier
                            </button>
                         </div>
                      </div>
                   </div>
-                </motion.div>
+                  </motion.div>
                 );
               })}
             </div>
           )}
 
           {/* Pagination */}
-          <div className="mt-12 flex flex-col items-center gap-6">
-             <div className="flex items-center gap-2">
-                {[1, 2, 3, '...', 8].map((page, i) => (
-                   <button 
-                     key={i} 
-                     className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${page === 1 ? 'bg-primary-blue text-white shadow-lg' : 'hover:bg-light-gray text-medium-gray'}`}
-                   >
-                     {page}
-                   </button>
-                ))}
-             </div>
-             <p className="text-sm text-medium-gray">Affichage de 1 à 20 sur 124 produits</p>
-          </div>
+          {!loading && totalPages > 1 && (
+            <div className="mt-12 flex flex-col items-center gap-6">
+               <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }).map((_, idx) => {
+                     const pageNum = idx + 1;
+                     return (
+                       <button 
+                         key={pageNum}
+                         onClick={() => setCurrentPage(pageNum)}
+                         className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${currentPage === pageNum ? 'bg-primary-blue text-white shadow-lg' : 'hover:bg-light-gray text-medium-gray'}`}
+                       >
+                         {pageNum}
+                       </button>
+                     );
+                  })}
+               </div>
+               <p className="text-sm text-medium-gray">
+                 {language === 'fr' 
+                   ? `Page ${currentPage} sur ${totalPages} (${totalProducts} produits au total)` 
+                   : `Page ${currentPage} of ${totalPages} (${totalProducts} products total)`}
+               </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -519,24 +627,86 @@ export const CataloguePage = () => {
                   <button className="text-red-500 font-bold" onClick={() => setIsMobileFilterOpen(false)}><X className="w-6 h-6" /></button>
                </div>
                <div className="flex-1 overflow-y-auto px-6 pb-24 space-y-8">
-                  {/* Reuse filter sections here but larger for mobile */}
                   <FilterSection title="VUE">
                     <div className="grid grid-cols-2 gap-4">
                        <button onClick={() => setViewMode('grid')} className={`h-12 rounded-xl flex items-center justify-center gap-2 font-bold border-2 transition-all ${viewMode === 'grid' ? 'bg-primary-blue text-white border-primary-blue' : 'border-light-gray'}`}><Grid className="w-5 h-5"/> Grille</button>
                        <button onClick={() => setViewMode('list')} className={`h-12 rounded-xl flex items-center justify-center gap-2 font-bold border-2 transition-all ${viewMode === 'list' ? 'bg-primary-blue text-white border-primary-blue' : 'border-light-gray'}`}><ListIcon className="w-5 h-5"/> Liste</button>
                     </div>
                   </FilterSection>
+
+                  <FilterSection title="CATEGORIES">
+                    <div className="space-y-1">
+                       {!rootCategory ? (
+                         // Show all root categories
+                         subCategories.map(cat => (
+                           <button 
+                             key={cat.id}
+                             onClick={() => { handleCategoryClick(cat.slug || cat.id); setIsMobileFilterOpen(false); }}
+                             className="w-full text-left text-sm py-3 px-4 rounded-xl font-bold transition-all capitalize text-dark-gray bg-light-gray/30 hover:bg-light-gray flex items-center justify-between"
+                           >
+                             {cat.name}
+                             <ChevronRight className="w-4 h-4 text-medium-gray" />
+                           </button>
+                         ))
+                       ) : (
+                         // Show root category context and its subcategories
+                         <>
+                           <button 
+                             onClick={() => { handleCategoryClick(null); setIsMobileFilterOpen(false); }}
+                             className="w-full text-left text-sm py-2 px-3 rounded-xl font-bold transition-all bg-light-gray/50 text-dark-gray flex items-center gap-2 mb-3"
+                           >
+                             <ChevronRight className="w-4 h-4 rotate-180" /> {language === 'fr' ? 'Toutes les catégories' : 'All Categories'}
+                           </button>
+                           
+                           <button 
+                             onClick={() => { handleCategoryClick(rootCategory.slug || rootCategory.id); setIsMobileFilterOpen(false); }}
+                             className={`w-full text-left text-sm py-3 px-4 rounded-xl font-black transition-all capitalize mb-2 ${selectedCategory === rootCategory.slug || selectedCategory === rootCategory.id || selectedCategory?.toLowerCase() === rootCategory.name.toLowerCase() ? 'bg-primary-blue text-white shadow-lg' : 'bg-light-gray/50 text-dark-gray'}`}
+                           >
+                             {rootCategory.name} {language === 'fr' ? '(Tout)' : '(All)'}
+                           </button>
+                           
+                           <div className="pl-3 border-l-2 border-light-gray ml-3 space-y-2 mt-2">
+                             {subCategories.map(sub => {
+                               const isActive = selectedCategory === sub.slug || selectedCategory === sub.id || selectedCategory?.toLowerCase() === sub.name.toLowerCase();
+                               return (
+                                 <button 
+                                   key={sub.id}
+                                   onClick={() => { handleCategoryClick(sub.slug || sub.id); setIsMobileFilterOpen(false); }}
+                                   className={`w-full text-left text-sm py-2 px-3 rounded-xl font-bold transition-all capitalize flex items-center gap-3 ${isActive ? 'bg-primary-blue/10 text-primary-blue' : 'text-medium-gray hover:text-dark-gray'}`}
+                                 >
+                                   <div className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-primary-blue' : 'bg-transparent border border-medium-gray'}`} />
+                                   {sub.name}
+                                 </button>
+                               )
+                             })}
+                           </div>
+                         </>
+                       )}
+                    </div>
+                  </FilterSection>
+
                   <FilterSection title="TRIER PAR">
-                    <div className="space-y-4">
-                       {['Pertinence', 'Prix croissant', 'Prix décroissant', 'Mieux notés'].map(opt => (
-                         <label key={opt} className="flex items-center justify-between p-4 bg-light-gray/30 rounded-xl">
-                            <span className="font-bold">{opt}</span>
-                            <input type="radio" name="sort" className="w-5 h-5 accent-primary-blue" />
+                    <div className="space-y-2">
+                       {[
+                         { value: 'pertinence', label: t.relevance },
+                         { value: 'prix-croissant', label: t.priceAsc },
+                         { value: 'prix-decroissant', label: t.priceDesc },
+                         { value: 'nouveautes', label: language === 'fr' ? 'Nouveautés' : 'Newest' }
+                       ].map(opt => (
+                         <label key={opt.value} className="flex items-center justify-between p-4 bg-light-gray/30 rounded-xl cursor-pointer">
+                            <span className="font-bold text-sm">{opt.label}</span>
+                            <input 
+                              type="radio" 
+                              name="sort" 
+                              value={opt.value}
+                              checked={sortBy === opt.value}
+                              onChange={() => setSortBy(opt.value)}
+                              className="w-5 h-5 accent-primary-blue" 
+                            />
                          </label>
                        ))}
                     </div>
                   </FilterSection>
-                  {/* More filters... */}
                </div>
                <div className="p-6 bg-white border-t absolute bottom-0 inset-x-0">
                   <button onClick={() => setIsMobileFilterOpen(false)} className="w-full h-14 bg-primary-blue text-white font-display font-bold rounded-xl shadow-xl">
@@ -555,28 +725,20 @@ const CategoryCard: React.FC<{ cat: any, onClick: () => void, className?: string
   const { language } = useAppContext();
   
   return (
-  <motion.div 
-    onClick={onClick}
-    className={`relative ${className || ''} ${cat.width || ''} h-64 lg:h-full rounded-2xl overflow-hidden cursor-pointer group`}
-    whileHover={{ scale: 0.99 }}
-  >
-    <img 
-      src={cat.image} 
-      loading="lazy"
-      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-      alt={cat.title} 
-    />
-    <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent" />
-    <div className="absolute bottom-8 left-8 text-white">
-      <h3 className="text-2xl md:text-3xl font-display font-black mb-1">{cat.title}</h3>
-      <p className="text-white/70 text-sm mb-4 font-sans">{cat.count} {language === 'fr' ? 'produits' : 'products'}</p>
-      <button className="px-6 py-2 border border-white/50 bg-white/10 backdrop-blur-sm rounded-lg text-sm font-bold group-hover:bg-white group-hover:text-primary-blue transition-all">
-        {language === 'fr' ? 'Explorer' : 'Explore'}
-      </button>
-    </div>
-    <div className="absolute inset-0 border-0 group-hover:border-[4px] border-white/30 rounded-2xl transition-all duration-300" />
-  </motion.div>
-);
+    <motion.div 
+      onClick={onClick}
+      className={`relative ${className || ''} h-32 md:h-40 bg-white border border-light-gray rounded-2xl overflow-hidden cursor-pointer group flex flex-col items-center justify-center p-4 md:p-6 shadow-sm hover:shadow-xl hover:border-primary-blue transition-all duration-300`}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+    >
+      <div className="absolute inset-0 bg-primary-blue/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <h3 className="text-lg md:text-2xl font-display font-black text-dark-gray group-hover:text-primary-blue transition-colors text-center relative z-10">{cat.title}</h3>
+      <p className="text-medium-gray text-[10px] md:text-sm mt-1 md:mt-2 font-bold relative z-10">{cat.count} {language === 'fr' ? 'produits' : 'products'}</p>
+      
+      {/* Decorative accent */}
+      <div className="absolute bottom-0 left-0 h-1.5 w-0 bg-primary-blue group-hover:w-full transition-all duration-500 ease-out" />
+    </motion.div>
+  );
 };
 
 const FilterSection = ({ title, children }: { title: string, children: React.ReactNode }) => (

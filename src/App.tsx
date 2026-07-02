@@ -4,13 +4,14 @@
  */
 
 import React from 'react';
-import { AppProvider, useAppContext } from './context/AppContext';
+import { AppProvider, useAppContext, Product } from './context/AppContext';
 import { TopBar, BenefitBar, PromotionalMarquee } from './components/PromoBands';
 import { Header } from './components/Header';
 import { Trash2, Plus, Minus, ArrowLeft, ShoppingCart, Heart, Package, ShieldCheck, Truck, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations } from './translations';
 import { PageLoader } from './components/LoadingComponents';
+import { getNewArrivals, getBestSellers } from './services/catalogueService';
 
 // ─── Lazy-loaded heavy page components ───
 const HeroBanner = React.lazy(() => import('./components/HeroBanner').then(m => ({ default: m.HeroBanner })));
@@ -29,9 +30,32 @@ const CustomerSpace = React.lazy(() => import('./components/CustomerSpace').then
 const AdminLayout = React.lazy(() => import('./components/admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
 
 function HomePage() {
-  const { products, language } = useAppContext();
-  const newArrivals = products.slice(0, 6);
-  const bestSellers = products.slice(); // Or filter based on some logic
+  const { language } = useAppContext();
+  const [newArrivals, setNewArrivals] = React.useState<Product[]>([]);
+  const [bestSellers, setBestSellers] = React.useState<Product[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let active = true;
+    const fetchSections = async () => {
+      try {
+        const [arrivals, sellers] = await Promise.all([
+          getNewArrivals(8),
+          getBestSellers(8)
+        ]);
+        if (active) {
+          setNewArrivals(arrivals);
+          setBestSellers(sellers);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des sections accueil:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchSections();
+    return () => { active = false; };
+  }, []);
 
   return (
     <>
@@ -42,25 +66,33 @@ function HomePage() {
       <React.Suspense fallback={<div className="h-40" />}>
         <CategoryGrid />
       </React.Suspense>
-      <React.Suspense fallback={<PageLoader />}>
-        <ProductSection 
-          title={language === 'fr' ? "Nouveaux Arrivages" : "New Arrivals"} 
-          subtitle={language === 'fr' ? "Les dernières pièces ajoutées au catalogue" : "The latest items added to the catalog"} 
-          products={newArrivals} 
-          badgeType={language === 'fr' ? "NOUVEAU" : "NEW"}
-        />
-      </React.Suspense>
-      <React.Suspense fallback={<div className="h-60" />}>
-        <IntermediaryBanner />
-      </React.Suspense>
-      <React.Suspense fallback={<PageLoader />}>
-        <ProductSection 
-          title={language === 'fr' ? "Meilleures Ventes" : "Best Sellers"} 
-          subtitle={language === 'fr' ? "Les produits les plus populaires de la semaine" : "The most popular products of the week"} 
-          products={bestSellers} 
-          badgeType={language === 'fr' ? "TOP VENTE" : "TOP SELLER"}
-        />
-      </React.Suspense>
+      
+      {loading ? (
+        <div className="py-12 text-center text-medium-gray font-bold animate-pulse">Chargement de la collection...</div>
+      ) : (
+        <>
+          <React.Suspense fallback={<PageLoader />}>
+            <ProductSection 
+              title={language === 'fr' ? "Nouveaux Arrivages" : "New Arrivals"} 
+              subtitle={language === 'fr' ? "Les dernières pièces ajoutées au catalogue" : "The latest items added to the catalog"} 
+              products={newArrivals} 
+              badgeType={language === 'fr' ? "NOUVEAU" : "NEW"}
+            />
+          </React.Suspense>
+          <React.Suspense fallback={<div className="h-60" />}>
+            <IntermediaryBanner />
+          </React.Suspense>
+          <React.Suspense fallback={<PageLoader />}>
+            <ProductSection 
+              title={language === 'fr' ? "Meilleures Ventes" : "Best Sellers"} 
+              subtitle={language === 'fr' ? "Les produits les plus populaires de la semaine" : "The most popular products of the week"} 
+              products={bestSellers} 
+              badgeType={language === 'fr' ? "TOP VENTE" : "TOP SELLER"}
+            />
+          </React.Suspense>
+        </>
+      )}
+
       <React.Suspense fallback={<div className="h-60" />}>
         <div className="bg-light-gray/30">
           <ApplianceSection />
@@ -119,7 +151,7 @@ function CartPage() {
           {cart.map(item => (
             <motion.div 
               layout
-              key={item.id} 
+              key={`${item.id}-${item.selectedColor || 'no-color'}-${item.selectedSize || 'no-size'}`} 
               className="bg-white p-3 md:p-6 rounded-xl border border-light-gray flex gap-4 md:gap-6 relative group"
             >
               <div className="w-24 md:w-32 h-24 md:h-32 bg-light-gray rounded-lg overflow-hidden shrink-0">
@@ -200,25 +232,28 @@ function AppContent() {
     return hash.split('?')[0] || 'home';
   });
   const [showBackToTop, setShowBackToTop] = React.useState(false);
-  const [appReady, setAppReady] = React.useState(false);
-  const { cart } = useAppContext();
+  const { cart, authLoading } = useAppContext();
 
-  // Dismiss splash screen once app is mounted
+  // Dismiss splash screen once app is mounted and auth is loaded
   React.useEffect(() => {
+    if (authLoading) return; // Wait until session is loaded
+
+    // Re-sync route from hash after auth finishes (component returned null during load)
+    const hash = window.location.hash.replace('#', '');
+    const currentRoute = hash.split('?')[0] || 'home';
+    setRoute(currentRoute);
+
     const splash = document.getElementById('splash-loader');
     if (splash) {
-      // Small delay to allow first paint
       const timer = setTimeout(() => {
         splash.classList.add('fade-out');
         setTimeout(() => splash.remove(), 600);
-      }, 300);
+      }, 150);
       return () => clearTimeout(timer);
     }
-    setAppReady(true);
-  }, []);
+  }, [authLoading]);
 
   React.useEffect(() => {
-    // Force home if hash is completely empty or just #
     if (window.location.hash === '' || window.location.hash === '#') {
       setRoute('home');
     }
@@ -244,6 +279,12 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Early return APRÈS tous les hooks — Rules of Hooks respectées
+  if (authLoading) {
+    // Return null so the global splash-loader remains visible without rendering a second loader
+    return null;
+  }
+
   // Admin routing check
   if (route.startsWith('admin')) {
     return (
@@ -265,7 +306,7 @@ function AppContent() {
           {route === 'cart' && <CartPage />}
           {(route === 'wishlist' || route.startsWith('profile')) && <CustomerSpace />}
           {route === 'checkout' && <CheckoutTunnel />}
-          {route.startsWith('product/') && (
+          {route.startsWith('produits/') && (
             <ProductDetailPage productId={route.split('/')[1]} />
           )}
           {(route === 'login' || route === 'signup') && (

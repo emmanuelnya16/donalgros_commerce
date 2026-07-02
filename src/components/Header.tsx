@@ -140,11 +140,11 @@ export const Header = () => {
                       <div className="space-y-1">
                         <div className="flex items-center gap-3 pb-4 border-b border-light-gray mb-2">
                           <div className="w-12 h-12 bg-gradient-to-tr from-primary-blue to-primary-green text-white rounded-full flex items-center justify-center font-bold text-lg">
-                            {user.name.charAt(0)}
+                            {user.firstName.charAt(0)}
                           </div>
                           <div className="overflow-hidden">
-                            <p className="font-bold text-dark-gray truncate">{user.name}</p>
-                            <p className="text-xs text-medium-gray truncate">{user.email}</p>
+                            <p className="font-bold text-dark-gray truncate">{user.fullName}</p>
+                            <p className="text-xs text-medium-gray truncate">{user.phone}</p>
                           </div>
                         </div>
                         <UserMenuItem 
@@ -235,7 +235,7 @@ export const Header = () => {
                         </div>
                         <div className="max-h-[320px] overflow-y-auto space-y-3 pr-1 no-scrollbar">
                           {cart.map(item => (
-                            <div key={item.id} className="flex gap-3 group">
+                            <div key={`${item.id}-${item.selectedColor || 'no-color'}-${item.selectedSize || 'no-size'}`} className="flex gap-3 group">
                               <div className="w-16 h-16 bg-light-gray rounded-lg overflow-hidden shrink-0">
                                 <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                               </div>
@@ -365,11 +365,11 @@ export const Header = () => {
                     }}
                   />
                   <div className="w-12 h-12 bg-primary-blue text-white rounded-full flex items-center justify-center font-bold text-lg ring-4 ring-blue-50">
-                    {user ? user.name.charAt(0) : 'DG'}
+                    {user ? user.firstName.charAt(0) : 'DG'}
                   </div>
                   <div>
-                    <p className="font-bold">{user ? `Bonjour, ${user.name}` : 'Bienvenue'}</p>
-                    <p className="text-sm text-medium-gray">{user ? user.email : 'Mon compte'}</p>
+                    <p className="font-bold">{user ? `Bonjour, ${user.firstName}` : 'Bienvenue'}</p>
+                    <p className="text-sm text-medium-gray">{user ? user.phone : 'Mon compte'}</p>
                   </div>
                 </div>
                 <button onClick={() => setIsMobileMenuOpen(false)}>

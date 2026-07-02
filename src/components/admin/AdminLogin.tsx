@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Lock, Eye, EyeOff, ShieldCheck, ArrowLeft, Mail } from 'lucide-react';
+import { Lock, Eye, EyeOff, ShieldCheck, ArrowLeft, Mail, AlertCircle, Loader2 } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
+import { extractErrorMessage } from '../../services/adminAuthService';
 
 export const AdminLogin = () => {
   const { adminLogin } = useAppContext();
@@ -11,21 +12,20 @@ export const AdminLogin = () => {
   const [error, setError] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    // Simulate network delay
-    setTimeout(() => {
-      const success = adminLogin(email, password);
-      if (success) {
-        window.location.hash = 'admin/dashboard';
-      } else {
-        setError("Identifiants invalides ou accès non autorisé.");
-        setIsLoading(false);
-      }
-    }, 800);
+    try {
+      // Appelle POST /api/admin/auth/login via le contexte
+      await adminLogin({ email, password });
+      window.location.hash = 'admin/dashboard';
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Identifiants invalides ou accès non autorisé.'));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -57,13 +57,15 @@ export const AdminLogin = () => {
           <p className="text-sm text-medium-gray font-sans italic">Espace réservé au personnel autorisé</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 pt-0 space-y-6">
+        <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-6">
+          {/* Bandeau d'erreur */}
           {error && (
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-50 text-red-600 p-3 rounded-lg text-xs font-bold border border-red-100"
+              className="flex items-start gap-2 bg-red-50 text-red-600 p-3 rounded-lg text-xs font-bold border border-red-100"
             >
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               {error}
             </motion.div>
           )}
@@ -120,15 +122,15 @@ export const AdminLogin = () => {
             className="w-full h-12 bg-primary-blue text-white rounded-xl font-display font-black text-sm uppercase tracking-widest hover:bg-primary-blue/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-primary-blue/20"
           >
             {isLoading ? (
-               <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+              <><Loader2 className="w-5 h-5 animate-spin" /> Connexion…</>
             ) : (
-               "Accéder au Back-Office"
+              'Accéder au Back-Office'
             )}
           </button>
         </form>
 
         <div className="p-6 bg-light-gray/30 border-t border-light-gray text-center">
-           <p className="text-[10px] text-medium-gray font-medium">Session sécurisée - Chiffrement AES-256</p>
+          <p className="text-[10px] text-medium-gray font-medium">Session sécurisée — JWT + Cookie HttpOnly</p>
         </div>
       </motion.div>
     </div>

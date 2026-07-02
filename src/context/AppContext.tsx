@@ -1,7 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { AuthUser, userLogin, userRegister, userLogout, getMe, LoginPayload, RegisterPayload } from '../services/authService';
+import { AuthAdmin, adminLogin as apiAdminLogin, adminLogout as apiAdminLogout, AdminLoginPayload, getAdminMe } from '../services/adminAuthService';
+import { getPublicCategories, getPublicProducts, archiveAdminProduct } from '../services/catalogueService';
+import api, { tokenStore } from '../services/api';
 
 export interface Product {
   id: string;
+  slug?: string;
   name: string;
   brand: string;
   price: number;
@@ -20,13 +25,29 @@ export interface Product {
     colors?: { name: string; hex: string }[];
     sizes?: string[];
   };
+  variants?: {
+    id: number;
+    size?: string;
+    color?: string;
+    colorHex?: string;
+    stock: number;
+    effectivePrice: number;
+    isInStock: boolean;
+    isLowStock: boolean;
+    label?: string;
+  }[];
+  status?: 'active' | 'draft' | 'archived';
 }
 
 interface CartItem extends Product {
   quantity: number;
   selectedColor?: string;
   selectedSize?: string;
+  /** ID numérique de la variante Symfony — requis pour POST /api/orders */
+  variantId?: number;
 }
+
+export type { CartItem };
 
 export type OrderStatus = 'En attente' | 'Confirmé' | 'En préparation' | 'Expédié' | 'Livré' | 'Annulé' | 'Paiement échoué';
 
@@ -61,6 +82,7 @@ export interface Review {
 export interface Category {
   id: string;
   name: string;
+  slug?: string;
   parentId: string | null;
   image?: string;
   description?: string;
@@ -81,12 +103,7 @@ export interface Promotion {
   target?: { type: 'category' | 'product' | 'all'; id?: string };
 }
 
-export interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  role: 'super_admin' | 'manager';
-}
+export type AdminUser = AuthAdmin;
 
 export interface StoreSettings {
   name: string;
@@ -116,7 +133,8 @@ interface AppContextType {
   cart: CartItem[];
   wishlist: Product[];
   products: Product[];
-  user: { name: string; email: string } | null;
+  /** Utilisateur client connecté — données réelles du backend Symfony */
+  user: AuthUser | null;
   adminUser: AdminUser | null;
   orders: Order[];
   addresses: Address[];
@@ -125,15 +143,21 @@ interface AppContextType {
   promotions: Promotion[];
   settings: StoreSettings;
   language: Language;
+  /** true pendant la tentative de restauration de session au démarrage */
+  authLoading: boolean;
   
   // Client Actions
   setLanguage: (lang: Language) => void;
-  addToCart: (product: Product, quantity?: number, options?: { color?: string; size?: string }) => void;
+  addToCart: (product: Product, quantity?: number, options?: { color?: string; size?: string; variantId?: number }) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, delta: number) => void;
   toggleWishlist: (product: Product) => void;
-  login: (name: string, email: string) => void;
-  logout: () => void;
+  /** Connexion réelle : appelle POST /api/auth/login */
+  login: (payload: LoginPayload) => Promise<void>;
+  /** Inscription réelle : appelle POST /api/auth/register */
+  register: (payload: RegisterPayload) => Promise<void>;
+  /** Déconnexion réelle : appelle POST /api/auth/logout */
+  logout: () => Promise<void>;
   getProductById: (id: string) => Product | undefined;
   clearCart: () => void;
   addOrder: (order: Omit<Order, 'id' | 'date' | 'status'>) => void;
@@ -141,181 +165,34 @@ interface AppContextType {
   removeAddress: (id: string) => void;
 
   // Admin Actions
-  adminLogin: (email: string, password: string) => boolean;
-  adminLogout: () => void;
+  /** Connexion admin réelle : appelle POST /api/admin/auth/login */
+  adminLogin: (payload: AdminLoginPayload) => Promise<void>;
+  /** Déconnexion admin réelle : appelle POST /api/admin/auth/logout */
+  adminLogout: () => Promise<void>;
   upsertProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus, note?: string) => void;
   moderateReview: (reviewId: string, status: 'approved' | 'rejected') => void;
   upsertPromotion: (promotion: Promotion) => void;
   updateSettings: (settings: StoreSettings) => void;
+  refreshCatalog: () => Promise<void>;
 }
 
-const INITIAL_PRODUCTS: Product[] = [
-  {
-    id: 'c1',
-    name: 'Chemise Slim Fit Premium',
-    brand: 'Donald Gros',
-    price: 25000,
-    originalPrice: 32000,
-    rating: 4.5,
-    reviewsCount: 28,
-    image: 'https://images.unsplash.com/photo-1596755094514-f87034a764c1?q=80&w=1200&auto=format&fit=crop',
-    images: [
-      'https://images.unsplash.com/photo-1596755094514-f87034a764c1?q=80&w=1200&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=1200&auto=format&fit=crop'
-    ],
-    stock: 15,
-    category: 'homme',
-    description: "Une chemise élégante conçue pour l'homme moderne.",
-    specifications: { "Matière": "100% Coton", "Coupe": "Slim Fit" },
-    variations: {
-      colors: [{ name: 'Blanc', hex: '#FFFFFF' }, { name: 'Bleu', hex: '#1e3a8a' }],
-      sizes: ['S', 'M', 'L', 'XL']
-    }
-  },
-  {
-    id: 'c2',
-    name: 'T-shirt Graphic Essentials',
-    brand: 'Adidas',
-    price: 15000,
-    rating: 4.2,
-    reviewsCount: 12,
-    image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?q=80&w=1200&auto=format&fit=crop',
-    images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?q=80&w=1200&auto=format&fit=crop'],
-    stock: 50,
-    category: 'homme',
-    description: "Confortable et stylé pour un look décontracté.",
-    specifications: { "Matière": "Coton", "Style": "Casual" }
-  },
-  {
-    id: 'c3',
-    name: 'Nike Air Max 270',
-    brand: 'Nike',
-    price: 95000,
-    originalPrice: 110000,
-    rating: 4.9,
-    reviewsCount: 156,
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1200&auto=format&fit=crop',
-    images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1200&auto=format&fit=crop'],
-    stock: 20,
-    category: 'chaussures',
-    description: "L'icône du confort et du style urbain.",
-    specifications: { "Matière": "Synthétique", "Usage": "Sport/Lifestyle" },
-    variations: { sizes: ['40', '41', '42', '43', '44'] }
-  },
-  {
-    id: 'c4',
-    name: 'Réfrigérateur Smart LG Side-by-Side',
-    brand: 'LG',
-    price: 450000,
-    rating: 4.7,
-    reviewsCount: 45,
-    image: 'https://images.unsplash.com/photo-1571175484658-5121485ff363?q=80&w=1200&auto=format&fit=crop',
-    images: ['https://images.unsplash.com/photo-1571175484658-5121485ff363?q=80&w=1200&auto=format&fit=crop'],
-    stock: 5,
-    category: 'electromenager',
-    description: "Innovation technologique pour votre cuisine.",
-    specifications: { "Capacité": "600 Litres", "Classe": "A++" }
-  },
-  {
-    id: 'c5',
-    name: 'Blazer Élégant Femme',
-    brand: 'Zara',
-    price: 45000,
-    rating: 4.6,
-    reviewsCount: 22,
-    image: 'https://images.unsplash.com/photo-1548126032-079a0fb0099d?q=80&w=1200&auto=format&fit=crop',
-    images: ['https://images.unsplash.com/photo-1548126032-079a0fb0099d?q=80&w=1200&auto=format&fit=crop'],
-    stock: 12,
-    category: 'femme',
-    description: "Le must-have pour vos soirées et rendez-vous professionnels.",
-    specifications: { "Matière": "Polyester/Laine", "Coupe": "Cintrée" },
-    variations: { sizes: ['36', '38', '40', '42'] }
-  },
-  {
-    id: 'c6',
-    name: 'Machine à laver Samsung EcoBubble',
-    brand: 'Samsung',
-    price: 320000,
-    rating: 4.5,
-    reviewsCount: 30,
-    image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=1200&auto=format&fit=crop',
-    images: ['https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=1200&auto=format&fit=crop'],
-    stock: 8,
-    category: 'electromenager',
-    description: "Lavage efficace à basse température.",
-    specifications: { "Capacité": "9kg", "Classe": "A+++" }
-  },
-  {
-    id: 'c7',
-    name: 'Jeans Slim Fit Dark Blue',
-    brand: 'Massimo Dutti',
-    price: 35000,
-    rating: 4.4,
-    reviewsCount: 18,
-    image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=1200&auto=format&fit=crop',
-    images: ['https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=1200&auto=format&fit=crop'],
-    stock: 25,
-    category: 'homme',
-    description: "Un classique indémodable pour toutes les occasions.",
-    specifications: { "Matière": "Denim", "Coupe": "Slim" },
-    variations: { sizes: ['30', '32', '34', '36'] }
-  }
-];
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: '#DG-2025-4512',
-      date: '12 Janvier 2025, 14:30',
-      items: [
-        { ...INITIAL_PRODUCTS[0], quantity: 1, selectedSize: 'M', selectedColor: 'Bleu' },
-        { ...INITIAL_PRODUCTS[2], quantity: 1, selectedSize: '42' }
-      ],
-      total: 121500,
-      status: 'Livré',
-      paymentMode: 'now',
-      paymentStatus: 'payé',
-      address: { city: 'Douala', district: 'Akwa', details: 'Face Boulangerie Z' }
-    },
-    {
-      id: '#DG-2025-8901',
-      date: '02 Février 2025, 10:15',
-      items: [
-        { ...INITIAL_PRODUCTS[1], quantity: 2 }
-      ],
-      total: 31500,
-      status: 'En préparation',
-      paymentMode: 'delivery',
-      paymentStatus: 'en attente',
-      address: { city: 'Yaoundé', district: 'Bastos', details: 'Immeuble ABC' }
-    }
-  ]);
-  const [addresses, setAddresses] = useState<Address[]>([
-    { id: 'addr-1', label: 'Domicile', name: 'Jean Dupont', phone: '677000000', city: 'Douala', district: 'Bonapriso', details: 'Rue 1.234' },
-    { id: 'addr-2', label: 'Bureau', name: 'Jean Dupont', phone: '699000000', city: 'Douala', district: 'Akwa', details: 'Immeuble Liberté' }
-  ]);
-  const [reviews, setReviews] = useState<Review[]>([
-    { id: 'rev-1', productId: 'c1', productName: 'Chemise Slim Fit', userName: 'Marc A.', rating: 5, title: 'Superbe !', comment: 'Qualité au rendez-vous.', date: '12/01/2025', status: 'approved', isVerifiedPurchase: true },
-    { id: 'rev-2', productId: 'c3', productName: 'Nike Air Max 270', userName: 'Saliou B.', rating: 4, title: 'Top', comment: 'Très confortable.', date: '15/01/2025', status: 'pending', isVerifiedPurchase: true }
-  ]);
-  const [categories, setCategories] = useState<Category[]>([
-    { id: 'homme', name: 'Homme', parentId: null, productCount: 3 },
-    { id: 'femme', name: 'Femme', parentId: null, productCount: 1 },
-    { id: 'chaussures', name: 'Chaussures', parentId: null, productCount: 1 },
-    { id: 'electromenager', name: 'Électroménager', parentId: null, productCount: 2 },
-  ]);
-  const [promotions, setPromotions] = useState<Promotion[]>([
-    { id: 'promo-1', code: 'BONJOUR25', type: 'percentage', value: 10, currentUses: 45, startDate: '2025-01-01', endDate: '2025-12-31', status: 'active' }
-  ]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [language, setLanguage] = useState<Language>('fr');
   const [settings, setSettings] = useState<StoreSettings>({
     name: 'Donald Gros',
@@ -333,30 +210,117 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     socials: { facebook: '#', instagram: '#', whatsapp: '#', tiktok: '#' }
   });
 
-  const getProductById = (id: string) => products.find(p => p.id === id);
+  // ─── Restauration de session au démarrage ───────────────────────────────────────────
+  // Stratégie : UN SEUL appel POST /api/auth/refresh au démarrage.
+  // Le backend retourne soit { user, accessToken } soit { admin, accessToken }.
+  // On détecte le type et on évite la double-révocation du cookie.
+  useEffect(() => {
+    let cancelled = false;
+    const restore = async () => {
+      try {
+        // Appel unique au refresh — récupère le nouveau token + type d'utilisateur
+        const { data: refreshData } = await api.post<{
+          success: boolean;
+          data: { accessToken: string; user?: AuthUser; admin?: AuthAdmin };
+        }>('/api/auth/refresh');
 
-  const addToCart = (product: Product, quantity: number = 1, options?: { color?: string; size?: string }) => {
+        const { accessToken, user: restoredUser, admin: restoredAdmin } = refreshData.data;
+        tokenStore.set(accessToken);
+
+        if (!cancelled) {
+          if (restoredUser) {
+            // C'est un utilisateur client
+            setUser(restoredUser);
+          } else if (restoredAdmin) {
+            // C'est un administrateur — on récupère le profil admin complet
+            setAdminUser(restoredAdmin);
+          }
+        }
+      } catch {
+        // Pas de cookie valide — l'utilisateur n'est pas connecté, c'est normal
+        tokenStore.clear();
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    };
+    restore();
+
+    // Écoute les événements de déconnexion forcée (ex: refresh token expiré)
+    const handleForceLogout = () => {
+      setUser(null);
+      setAdminUser(null);
+    };
+    window.addEventListener('auth:logout', handleForceLogout);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('auth:logout', handleForceLogout);
+    };
+  }, []);
+
+  // ─── Chargement initial du catalogue (produits & catégories) ────────────
+  useEffect(() => {
+    let cancelled = false;
+    const loadCatalog = async () => {
+      try {
+        const [cats, prodData] = await Promise.all([
+          getPublicCategories(),
+          getPublicProducts({ limit: 100 })
+        ]);
+        if (!cancelled) {
+          setCategories(cats);
+          setProducts(prodData.products);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement du catalogue:', err);
+      }
+    };
+    loadCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const getProductById = (idOrSlug: string) => products.find(p => p.id === idOrSlug || p.slug === idOrSlug);
+
+  const addToCart = (product: Product, quantity: number = 1, options?: { color?: string; size?: string; variantId?: number }) => {
     setCart(prev => {
-      const existing = prev.find(item => 
-        item.id === product.id && 
-        item.selectedColor === options?.color && 
+      const existing = prev.find(item =>
+        item.id === product.id &&
+        item.selectedColor === options?.color &&
         item.selectedSize === options?.size
       );
       if (existing) {
-        return prev.map(item => 
-          (item.id === product.id && item.selectedColor === options?.color && item.selectedSize === options?.size) 
-            ? { ...item, quantity: item.quantity + quantity } 
+        return prev.map(item =>
+          (item.id === product.id && item.selectedColor === options?.color && item.selectedSize === options?.size)
+            ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
-      return [...prev, { 
-        ...product, 
-        quantity, 
-        selectedColor: options?.color, 
-        selectedSize: options?.size 
+
+      // ─── Résolution du variantId ──────────────────────────────────────
+      // Si le variantId n'est pas fourni explicitement (ex: ajout rapide
+      // depuis la liste de produits), on cherche la variante correspondante
+      // dans product.variants. Sinon, on prend la première disponible.
+      let resolvedVariantId = options?.variantId;
+      if (!resolvedVariantId && product.variants && product.variants.length > 0) {
+        const matched = product.variants.find(v =>
+          (!options?.color || v.color === options.color) &&
+          (!options?.size  || v.size  === options.size)
+        );
+        resolvedVariantId = (matched ?? product.variants[0]).id;
+      }
+
+      return [...prev, {
+        ...product,
+        quantity,
+        selectedColor: options?.color,
+        selectedSize: options?.size,
+        variantId: resolvedVariantId,
       }];
     });
   };
+
 
   const removeFromCart = (productId: string) => {
     setCart(prev => prev.filter(item => item.id !== productId));
@@ -380,8 +344,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const login = (name: string, email: string) => setUser({ name, email });
-  const logout = () => setUser(null);
+  /**
+   * Connexion cliente réelle — appelle POST /api/auth/login
+   * Lance une exception en cas d'erreur (gérée dans AuthPages)
+   */
+  const login = useCallback(async (payload: LoginPayload): Promise<void> => {
+    const authUser = await userLogin(payload);
+    setUser(authUser);
+  }, []);
+
+  /**
+   * Inscription cliente réelle — appelle POST /api/auth/register
+   */
+  const register = useCallback(async (payload: RegisterPayload): Promise<void> => {
+    const authUser = await userRegister(payload);
+    setUser(authUser);
+  }, []);
+
+  /**
+   * Déconnexion réelle — révoque le refresh token en base + efface le cookie
+   */
+  const logout = useCallback(async (): Promise<void> => {
+    await userLogout();
+    setUser(null);
+    setCart([]);
+  }, []);
 
   const clearCart = () => setCart([]);
 
@@ -414,15 +401,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ADMIN ACTIONS
-  const adminLogin = (email: string, password: string) => {
-    if (email === 'admin@donaldgros.com' && password === 'admin123') {
-      setAdminUser({ id: 'adm1', name: 'Donald Gros', email, role: 'super_admin' });
-      return true;
-    }
-    return false;
-  };
+  const adminLoginFn = useCallback(async (payload: AdminLoginPayload): Promise<void> => {
+    const admin = await apiAdminLogin(payload);
+    setAdminUser(admin);
+  }, []);
 
-  const adminLogout = () => setAdminUser(null);
+  const adminLogoutFn = useCallback(async (): Promise<void> => {
+    await apiAdminLogout();
+    setAdminUser(null);
+  }, []);
 
   const upsertProduct = (product: Product) => {
     setProducts(prev => {
@@ -432,8 +419,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
+  const deleteProduct = async (id: string) => {
+    try {
+      await archiveAdminProduct(Number(id));
+      setProducts(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error("Erreur lors de l'archivage du produit:", err);
+      setProducts(prev => prev.filter(p => p.id !== id));
+    }
   };
 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
@@ -454,16 +447,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateSettings = (newSettings: StoreSettings) => setSettings(newSettings);
 
+  const refreshCatalog = async () => {
+    try {
+      const [cats, prodData] = await Promise.all([
+        getPublicCategories(),
+        getPublicProducts({ limit: 100 })
+      ]);
+      setCategories(cats);
+      setProducts(prodData.products);
+    } catch (err) {
+      console.error('Erreur lors du rechargement du catalogue:', err);
+    }
+  };
+
   return (
     <AppContext.Provider value={{ 
       cart, wishlist, user, adminUser, products,
       orders, addresses, reviews, categories, promotions, settings, language,
+      authLoading,
       setLanguage,
       addToCart, removeFromCart, updateQuantity, 
-      toggleWishlist, login, logout, getProductById,
+      toggleWishlist, login, register, logout, getProductById,
       clearCart, addOrder, addAddress, removeAddress,
-      adminLogin, adminLogout, upsertProduct, deleteProduct,
-      updateOrderStatus, moderateReview, upsertPromotion, updateSettings
+      adminLogin: adminLoginFn, adminLogout: adminLogoutFn, upsertProduct, deleteProduct,
+      updateOrderStatus, moderateReview, upsertPromotion, updateSettings, refreshCatalog
     }}>
       {children}
     </AppContext.Provider>
