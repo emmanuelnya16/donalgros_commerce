@@ -15,7 +15,14 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+// En développement : BASE_URL = '' → toutes les requêtes /api/* passent par le proxy Vite
+// (vite.config.ts redirige /api → localhost:8000 côté SERVEUR, pas navigateur)
+// → même origine pour le navigateur → cookie HttpOnly envoyé automatiquement ✅
+//
+// En production : BASE_URL = VITE_API_URL (même domaine, pas de proxy nécessaire)
+const BASE_URL = import.meta.env.DEV
+  ? ''                                          // dev : proxy Vite actif
+  : (import.meta.env.VITE_API_URL ?? '');
 
 // ─── Token en mémoire ─────────────────────────────────────────────────────────
 // Jamais stocké en localStorage/sessionStorage → protégé contre XSS
