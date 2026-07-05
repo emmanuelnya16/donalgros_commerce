@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AuthUser, userLogin, userRegister, userLogout, getMe, LoginPayload, RegisterPayload } from '../services/authService';
 import { AuthAdmin, adminLogin as apiAdminLogin, adminLogout as apiAdminLogout, AdminLoginPayload, getAdminMe } from '../services/adminAuthService';
 import { getPublicCategories, getPublicProducts, archiveAdminProduct } from '../services/catalogueService';
+import { publishReview, rejectReview } from '../services/adminReviewService';
 import api, { tokenStore, retryWithBackoff } from '../services/api';
 
 export interface Product {
@@ -74,9 +75,13 @@ export interface Review {
   rating: number;
   title: string;
   comment: string;
+  text?: string;
   date: string;
   status: 'pending' | 'approved' | 'rejected';
   isVerifiedPurchase: boolean;
+  purchasedVariant?: string | null;
+  rejectionReason?: string | null;
+  helpfulVotes?: number;
 }
 
 export interface Category {
@@ -211,7 +216,7 @@ interface AppContextType {
   upsertProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus, note?: string) => void;
-  moderateReview: (reviewId: string, status: 'approved' | 'rejected') => void;
+  moderateReview: (reviewId: string, status: 'approved' | 'rejected', reason?: string) => Promise<void>;
   upsertPromotion: (promotion: Promotion) => void;
   updateSettings: (settings: StoreSettings) => void;
   refreshCatalog: () => Promise<void>;
@@ -519,8 +524,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
 
-  const moderateReview = (reviewId: string, status: 'approved' | 'rejected') => {
-    setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, status } : r));
+  const moderateReview = async (reviewId: string, status: 'approved' | 'rejected', reason?: string) => {
+    try {
+      const idNum = Number(reviewId);
+      if (status === 'approved') {
+        await publishReview(idNum);
+        setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, status: 'approved' } : r));
+      } else {
+        await rejectReview(idNum, reason);
+        setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, status: 'rejected', rejectionReason: reason || null } : r));
+      }
+    } catch (err) {
+      console.error("Erreur lors de la modération de l'avis:", err);
+      // Fallback local en cas d'erreur
+      setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, status } : r));
+      throw err;
+    }
   };
 
   const upsertPromotion = (promo: Promotion) => {

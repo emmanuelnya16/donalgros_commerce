@@ -103,15 +103,15 @@ export const ProductCard: React.FC<{
         <div className="mt-auto flex items-end justify-between gap-1">
           <div className="flex flex-col min-w-0">
             {product.originalPrice && (
-              <span className="text-[9px] sm:text-[10px] md:text-sm text-medium-gray line-through decoration-red-400/50 mb-0.5">
-                {product.originalPrice.toLocaleString()} F
+              <span className="text-[9px] sm:text-[10px] md:text-sm text-medium-gray line-through decoration-red-400/50 mb-0.5 whitespace-nowrap">
+                {product.originalPrice.toLocaleString()} FCFA
               </span>
             )}
-            <div className="flex items-baseline gap-0.5 sm:gap-1">
+            <div className="flex items-baseline gap-0.5 sm:gap-1 flex-wrap min-w-0">
               <span className={`font-display font-black text-sm sm:text-base md:text-xl ${product.originalPrice ? 'text-red-600' : 'text-primary-blue'}`}>
                 {product.price.toLocaleString()}
               </span>
-              <span className="text-[8px] sm:text-[10px] md:text-xs font-bold text-medium-gray">F</span>
+              <span className="text-[8px] sm:text-[10px] md:text-xs font-bold text-medium-gray shrink-0">FCFA</span>
             </div>
           </div>
 

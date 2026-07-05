@@ -11,7 +11,7 @@ import { Trash2, Plus, Minus, ArrowLeft, ShoppingCart, Heart, Package, ShieldChe
 import { motion, AnimatePresence } from 'motion/react';
 import { translations } from './translations';
 import { PageLoader, SkeletonSection, SkeletonCategoryRow } from './components/LoadingComponents';
-import { getNewArrivals, getBestSellers } from './services/catalogueService';
+import { getNewArrivals, getBestSellers, getOnSaleProducts } from './services/catalogueService';
 import { retryWithBackoff } from './services/api';
 
 // ─── Lazy-loaded heavy page components ───
@@ -19,7 +19,6 @@ const HeroBanner = React.lazy(() => import('./components/HeroBanner').then(m => 
 const CategoryGrid = React.lazy(() => import('./components/HeroBanner').then(m => ({ default: m.CategoryGrid })));
 const ProductSection = React.lazy(() => import('./components/ProductSection').then(m => ({ default: m.ProductSection })));
 const IntermediaryBanner = React.lazy(() => import('./components/MainLayout').then(m => ({ default: m.IntermediaryBanner })));
-const ApplianceSection = React.lazy(() => import('./components/MainLayout').then(m => ({ default: m.ApplianceSection })));
 const ReassuranceBlock = React.lazy(() => import('./components/MainLayout').then(m => ({ default: m.ReassuranceBlock })));
 const Newsletter = React.lazy(() => import('./components/MainLayout').then(m => ({ default: m.Newsletter })));
 const Footer = React.lazy(() => import('./components/MainLayout').then(m => ({ default: m.Footer })));
@@ -34,6 +33,7 @@ function HomePage() {
   const { language, catalogLoading } = useAppContext();
   const [newArrivals, setNewArrivals] = React.useState<Product[]>([]);
   const [bestSellers, setBestSellers] = React.useState<Product[]>([]);
+  const [onSaleProducts, setOnSaleProducts] = React.useState<Product[]>([]);
   const [sectionsLoading, setSectionsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -46,15 +46,17 @@ function HomePage() {
         if (!active) return;
 
         // Retry automatique en cas d'erreur réseau (serveur pas encore prêt)
-        const [arrivals, sellers] = await retryWithBackoff(() =>
+        const [arrivals, sellers, sale] = await retryWithBackoff(() =>
           Promise.all([
             getNewArrivals(8),
             getBestSellers(8),
+            getOnSaleProducts(8),
           ])
         );
         if (active) {
           setNewArrivals(arrivals);
           setBestSellers(sellers);
+          setOnSaleProducts(sale);
         }
       } catch (err) {
         console.error('Erreur lors du chargement des sections accueil (toutes tentatives échouées):', err);
@@ -105,11 +107,18 @@ function HomePage() {
         </>
       )}
 
-      <React.Suspense fallback={<div className="h-60" />}>
-        <div className="bg-light-gray/30">
-          <ApplianceSection />
-        </div>
-      </React.Suspense>
+      {onSaleProducts.length > 0 && (
+        <React.Suspense fallback={<SkeletonSection count={4} />}>
+          <div className="bg-light-gray/20">
+            <ProductSection 
+              title={language === 'fr' ? "Offres Spéciales & Promotions" : "Special Offers & Sales"} 
+              subtitle={language === 'fr' ? "Nos meilleures réductions et bons plans" : "Our best discounts and special deals"} 
+              products={onSaleProducts} 
+              badgeType={language === 'fr' ? "PROMO" : "SALE"}
+            />
+          </div>
+        </React.Suspense>
+      )}
       <React.Suspense fallback={<div className="h-40" />}>
         <ReassuranceBlock />
         <Newsletter />

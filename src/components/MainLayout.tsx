@@ -30,70 +30,6 @@ export const IntermediaryBanner = () => {
   );
 };
 
-const APPLIANCES = [
-  { id: '1', name: 'Réfrigérateur Smart LG Side-by-Side 600L', brand: 'LG', price: 850000, rating: 4.8, reviews: 12, image: 'https://images.unsplash.com/photo-1571175432291-034732116024?q=80&w=400&auto=format&fit=crop', specs: 'Capacité : 600L | Wifi Intégré | Classe A++' },
-  { id: '2', name: 'Lave-linge Frontal Samsung 9kg EcoBubble', brand: 'SAMSUNG', price: 425000, rating: 4.9, reviews: 34, image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=400&auto=format&fit=crop', specs: 'Capacité : 9kg | Moteur Inverter | Garantie 5 ans' },
-  { id: '3', name: 'Cuisinière à Induction Moderne 5 Foyers', brand: 'BOSCH', price: 340000, rating: 4.7, reviews: 8, image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?q=80&w=400&auto=format&fit=crop', specs: 'Touch Control | Booster | Sécurité Enfant' },
-];
-
-export const ApplianceSection = () => {
-  const { language } = useAppContext();
-  const t = translations[language];
-
-  const APPLIANCES = [
-    { id: '1', name: language === 'fr' ? 'Réfrigérateur Smart LG Side-by-Side 600L' : 'LG Side-by-Side 600L Smart Refrigerator', brand: 'LG', price: 850000, rating: 4.8, reviews: 12, image: 'https://images.unsplash.com/photo-1571175432291-034732116024?q=80&w=400&auto=format&fit=crop', specs: language === 'fr' ? 'Capacité : 600L | Wifi Intégré | Classe A++' : 'Capacity: 600L | Built-in Wifi | Class A++' },
-    { id: '2', name: language === 'fr' ? 'Lave-linge Frontal Samsung 9kg EcoBubble' : 'Samsung 9kg EcoBubble Front Loader Washer', brand: 'SAMSUNG', price: 425000, rating: 4.9, reviews: 34, image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=400&auto=format&fit=crop', specs: language === 'fr' ? 'Capacité : 9kg | Moteur Inverter | Garantie 5 ans' : 'Capacity: 9kg | Inverter Motor | 5 Year Warranty' },
-    { id: '3', name: language === 'fr' ? 'Cuisinière à Induction Moderne 5 Foyers' : 'Modern 5 Burner Induction Cooktop', brand: 'BOSCH', price: 340000, rating: 4.7, reviews: 8, image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?q=80&w=400&auto=format&fit=crop', specs: language === 'fr' ? 'Touch Control | Booster | Sécurité Enfant' : 'Touch Control | Booster | Child Safety' },
-  ];
-
-  return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 py-16 bg-white">
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-display font-black text-dark-gray mb-3">{t.appliances}</h2>
-        <p className="text-medium-gray">{t.appliancesSub}</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {APPLIANCES.map((item) => (
-          <div key={item.id} className="group bg-white rounded-xl border border-light-gray h-full flex flex-col hover:shadow-2xl transition-all duration-500 overflow-hidden">
-            <div className="h-[280px] p-8 flex items-center justify-center bg-white border-b border-light-gray overflow-hidden">
-               <img src={item.image} alt={item.name} loading="lazy" className="max-h-full object-contain group-hover:scale-110 transition-transform duration-500" />
-            </div>
-            <div className="p-6 flex flex-col flex-1">
-               <div className="flex items-center gap-2 mb-2">
-                 <span className="px-2 py-0.5 bg-blue-100 text-primary-blue text-[10px] font-bold rounded uppercase">
-                   {language === 'fr' ? 'GARANTIE 2 ANS' : '2 YEAR WARRANTY'}
-                 </span>
-                 <span className="px-2 py-0.5 bg-green-100 text-primary-green text-[10px] font-bold rounded uppercase">
-                   {language === 'fr' ? 'LIVRAISON INCLUSE' : 'FREE DELIVERY'}
-                 </span>
-               </div>
-               <h3 className="font-display font-bold text-lg mb-2 text-dark-gray leading-snug">{item.name}</h3>
-               <p className="text-xs text-medium-gray mb-4 font-medium italic">{item.specs}</p>
-               
-               <div className="flex items-center gap-1 mb-4">
-                 {[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < 4 ? 'fill-orange-400 text-orange-400' : 'text-gray-300'}`} />)}
-                 <span className="text-xs text-medium-gray ml-2">{item.reviews} {language === 'fr' ? 'avis' : 'reviews'}</span>
-               </div>
-
-               <div className="mt-auto pt-6 border-t border-light-gray flex items-center justify-between">
-                 <span className="text-2xl font-display font-bold text-primary-blue">{item.price.toLocaleString()} FCFA</span>
-                 <button className="px-5 h-11 bg-primary-blue text-white font-bold rounded-lg hover:bg-dark-gray transition-colors flex items-center justify-center">
-                   {language === 'fr' ? 'Voir le produit' : 'View Product'}
-                 </button>
-               </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-};
-
-const Star: React.FC<{ className: string }> = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-);
-
 export const ReassuranceBlock = () => {
   const { language } = useAppContext();
   
@@ -201,10 +137,15 @@ export const Footer = () => {
             {t.help}
           </p>
           <div className="flex gap-4">
-            <button className="h-11 px-8 bg-primary-green text-white font-bold rounded-lg hover:bg-white hover:text-primary-green transition-all shadow-lg flex items-center gap-2">
+            <a 
+              href="https://wa.me/237696001685?text=Bonjour%20Donald%20Gros,%20j'ai%20besoin%20d'aide%20concernant%20un%20produit%20ou%20une%20commande."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-11 px-8 bg-primary-green text-white font-bold rounded-lg hover:bg-white hover:text-primary-green transition-all shadow-lg flex items-center justify-center gap-2"
+            >
               <MessageCircle className="w-5 h-5" />
               {language === 'fr' ? 'Nous Contacter' : 'Contact Us'}
-            </button>
+            </a>
           </div>
         </div>
       </div>
@@ -276,7 +217,14 @@ export const Footer = () => {
                </li>
                <li className="flex gap-4">
                  <Phone className="w-5 h-5 text-primary-green shrink-0" />
-                 <span className="text-sm text-white/60">+237 6XX XXX XXX</span>
+                 <a 
+                   href="https://wa.me/237696001685?text=Bonjour%20Donald%20Gros,%20j'ai%20besoin%20d'aide%20concernant%20un%20produit%20ou%20une%20commande."
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="text-sm text-white/60 hover:text-white transition-colors"
+                 >
+                   +237 696 001 685
+                 </a>
                </li>
                <li className="flex gap-4">
                  <Mail className="w-5 h-5 text-primary-green shrink-0" />

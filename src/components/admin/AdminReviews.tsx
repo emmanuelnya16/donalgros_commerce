@@ -2,16 +2,59 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Star, CheckCircle2, XCircle, Clock, Trash2, Filter, Search, User, Package } from 'lucide-react';
 import { useAppContext, Review } from '../../context/AppContext';
+import { getAdminReviews, deleteReview } from '../../services/adminReviewService';
 
 export const AdminReviews = () => {
-  const { reviews, moderateReview } = useAppContext();
+  const { moderateReview } = useAppContext();
   const [activeTab, setActiveTab] = React.useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [reviewsList, setReviewsList] = React.useState<Review[]>([]);
+  const [pendingBadgeCount, setPendingBadgeCount] = React.useState(0);
+  const [loading, setLoading] = React.useState(false);
 
-  // Add some mock reviews if empty
-  const displayReviews = reviews.length > 0 ? reviews.filter(r => r.status === activeTab) : [
-    { id: 'rev1', productId: 'c1', productName: 'Chemise Slim Fit', userName: 'Marc A.', rating: 5, title: 'Superbe qualité', comment: 'La coupe est parfaite et le tissu est très agréable à porter.', date: '12/03/2024', status: 'pending', isVerifiedPurchase: true },
-    { id: 'rev2', productId: 'c3', productName: 'Nike Air Max 270', userName: 'Saliou B.', rating: 4, title: 'Confortable', comment: 'Très bonnes chaussures mais taille un peu petit.', date: '10/03/2024', status: 'pending', isVerifiedPurchase: true },
-  ].filter(r => r.status === activeTab) as Review[];
+  const fetchReviews = React.useCallback(async (tabStatus: 'pending' | 'approved' | 'rejected') => {
+    setLoading(true);
+    try {
+      const backendStatus = tabStatus === 'approved' ? 'published' : tabStatus;
+      const data = await getAdminReviews(backendStatus);
+      setReviewsList(data.reviews);
+      setPendingBadgeCount(data.pendingCount);
+    } catch (err) {
+      console.error("Erreur lors de la récupération des avis administrateur:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchReviews(activeTab);
+  }, [activeTab, fetchReviews]);
+
+  const handleModerate = async (reviewId: string, status: 'approved' | 'rejected') => {
+    let reason = undefined;
+    if (status === 'rejected') {
+      const input = prompt("Raison du rejet de l'avis (optionnelle) :");
+      if (input === null) return; // Annulation
+      reason = input.trim();
+    }
+    try {
+      await moderateReview(reviewId, status, reason);
+      fetchReviews(activeTab);
+    } catch (err) {
+      alert("Une erreur est survenue lors de la modération.");
+    }
+  };
+
+  const handleDelete = async (reviewId: number) => {
+    if (!confirm("Voulez-vous vraiment supprimer cet avis définitivement ?")) return;
+    try {
+      await deleteReview(reviewId);
+      fetchReviews(activeTab);
+    } catch (err) {
+      alert("Erreur lors de la suppression de l'avis.");
+    }
+  };
+
+  const displayReviews = reviewsList;
 
   return (
     <div className="space-y-6">
@@ -42,12 +85,21 @@ export const AdminReviews = () => {
           >
             <tab.icon className={`w-4 h-4 ${tab.color}`} />
             {tab.label}
+            {tab.id === 'pending' && pendingBadgeCount > 0 && (
+              <span className="px-2 py-0.5 bg-orange-500 text-white text-[9px] rounded-full font-black animate-pulse ml-1">
+                {pendingBadgeCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {displayReviews.length === 0 ? (
+        {loading ? (
+          <div className="md:col-span-2 py-20 text-center">
+            <p className="text-sm font-medium text-medium-gray animate-pulse">Chargement des avis...</p>
+          </div>
+        ) : displayReviews.length === 0 ? (
           <div className="md:col-span-2 py-20 text-center bg-white rounded-3xl border border-dashed border-light-gray">
              <Star className="w-12 h-12 text-light-gray mx-auto mb-4" />
              <p className="text-sm font-medium text-medium-gray italic">Aucun avis dans cette catégorie.</p>
@@ -99,27 +151,30 @@ export const AdminReviews = () => {
               </div>
 
               <div className="flex items-center gap-2 pt-2 border-t border-light-gray">
-                 {activeTab === 'pending' && (
-                    <>
-                       <button 
-                          onClick={() => moderateReview(review.id, 'approved')}
-                          className="flex-1 h-9 bg-green-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:brightness-110 flex items-center justify-center gap-2"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Approuver
-                       </button>
-                       <button 
-                          onClick={() => moderateReview(review.id, 'rejected')}
-                          className="flex-1 h-9 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 flex items-center justify-center gap-2"
-                        >
-                          <XCircle className="w-3.5 h-3.5" /> Rejeter
-                       </button>
-                    </>
-                 )}
-                 {activeTab !== 'pending' && (
-                    <button className="flex-1 h-9 bg-light-gray text-medium-gray rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all flex items-center justify-center gap-2">
-                       <Trash2 className="w-3.5 h-3.5" /> Supprimer Définitivement
-                    </button>
-                 )}
+                  {activeTab === 'pending' && (
+                     <>
+                        <button 
+                           onClick={() => handleModerate(review.id, 'approved')}
+                           className="flex-1 h-9 bg-green-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:brightness-110 flex items-center justify-center gap-2"
+                         >
+                           <CheckCircle2 className="w-3.5 h-3.5" /> Approuver
+                        </button>
+                        <button 
+                           onClick={() => handleModerate(review.id, 'rejected')}
+                           className="flex-1 h-9 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 flex items-center justify-center gap-2"
+                         >
+                           <XCircle className="w-3.5 h-3.5" /> Rejeter
+                        </button>
+                     </>
+                  )}
+                  {activeTab !== 'pending' && (
+                     <button 
+                       onClick={() => handleDelete(Number(review.id))}
+                       className="flex-1 h-9 bg-light-gray text-medium-gray rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all flex items-center justify-center gap-2"
+                     >
+                        <Trash2 className="w-3.5 h-3.5" /> Supprimer Définitivement
+                     </button>
+                  )}
               </div>
             </motion.div>
           ))

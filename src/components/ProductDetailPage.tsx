@@ -5,9 +5,10 @@ import {
   Heart, Share2, Plus, Minus, ShoppingCart, Zap, 
   X, Check, ExternalLink, MessageCircle, Copy
 } from 'lucide-react';
-import { useAppContext, Product } from '../context/AppContext';
+import { useAppContext, Product, Review } from '../context/AppContext';
 import { translations } from '../translations';
 import { getPublicProductDetail, getSimilarProducts } from '../services/catalogueService';
+import { getProductReviews, submitReview, voteHelpful } from '../services/reviewService';
 import { PageLoader } from './LoadingComponents';
 import { ProductCard } from './ProductSection';
 
@@ -16,7 +17,7 @@ interface ProductDetailPageProps {
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId }) => {
-  const { addToCart, toggleWishlist, wishlist, language } = useAppContext();
+  const { addToCart, toggleWishlist, wishlist, language, user } = useAppContext();
   const t = translations[language];
 
   const [product, setProduct] = React.useState<Product | null>(null);
@@ -32,6 +33,89 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
   const [showZoom, setShowZoom] = React.useState(false);
   const [addedNotice, setAddedNotice] = React.useState(false);
 
+  // States pour la gestion des avis
+  const [reviews, setReviews] = React.useState<Review[]>([]);
+  const [reviewsTotal, setReviewsTotal] = React.useState(0);
+  const [reviewsPage, setReviewsPage] = React.useState(1);
+  const [reviewsLimit] = React.useState(5);
+  const [reviewsTotalPages, setReviewsTotalPages] = React.useState(1);
+  const [ratingDistribution, setRatingDistribution] = React.useState<{ [key: number]: number }>({ 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 });
+  const [reviewsLoading, setReviewsLoading] = React.useState(false);
+
+  // States pour le formulaire modal d'avis
+  const [showReviewModal, setShowReviewModal] = React.useState(false);
+  const [submitRating, setSubmitRating] = React.useState(5);
+  const [hoverRating, setHoverRating] = React.useState<number | null>(null);
+  const [submitTitle, setSubmitTitle] = React.useState('');
+  const [submitBody, setSubmitBody] = React.useState('');
+  const [submitLoading, setSubmitLoading] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = React.useState<string | null>(null);
+
+  const fetchReviews = React.useCallback(async (productSlug: string, page = 1) => {
+    setReviewsLoading(true);
+    try {
+      const data = await getProductReviews(productSlug, page, reviewsLimit);
+      setReviews(prev => page === 1 ? data.reviews : [...prev, ...data.reviews]);
+      setReviewsTotal(data.total);
+      setReviewsPage(data.page);
+      setReviewsTotalPages(data.totalPages);
+      setRatingDistribution(data.distribution);
+    } catch (err) {
+      console.error("Erreur chargement des avis:", err);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [reviewsLimit]);
+
+  const handleVoteHelpful = async (reviewId: number) => {
+    try {
+      const newVotes = await voteHelpful(reviewId);
+      setReviews(prev => prev.map(r => r.id === String(reviewId) ? { ...r, helpfulVotes: newVotes } : r));
+    } catch (err) {
+      console.error("Erreur lors du vote utile:", err);
+    }
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!product) return;
+    if (submitBody.trim().length < 10) {
+      setSubmitError(language === 'fr' ? "L'avis doit contenir au moins 10 caractères." : "Review must be at least 10 characters.");
+      return;
+    }
+    setSubmitLoading(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    try {
+      const res = await submitReview(Number(product.id), submitRating, submitTitle, submitBody);
+      if (res.success) {
+        setSubmitSuccess(res.message);
+        setSubmitTitle('');
+        setSubmitBody('');
+        setSubmitRating(5);
+        if (product.slug) {
+          fetchReviews(product.slug, 1);
+        }
+        setTimeout(() => {
+          setShowReviewModal(false);
+          setSubmitSuccess(null);
+        }, 2500);
+      }
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || (language === 'fr' ? "Erreur lors de la soumission de l'avis." : "Error submitting review.");
+      setSubmitError(errMsg);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleSeeMoreReviews = () => {
+    if (product && reviewsPage < reviewsTotalPages) {
+      fetchReviews(product.slug || product.id, reviewsPage + 1);
+    }
+  };
+
   React.useEffect(() => {
     let cancelled = false;
     const loadProduct = async () => {
@@ -42,6 +126,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
         if (!cancelled) {
           setProduct(prod);
           setActiveImage(0);
+          if (prod.slug) {
+            fetchReviews(prod.slug, 1);
+          }
           if (prod.variants && prod.variants.length > 0) {
             const firstInStock = prod.variants.find(v => v.isInStock) || prod.variants[0];
             if (firstInStock.color) setSelectedColor(firstInStock.color);
@@ -501,18 +588,19 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
               >
                 <div className="flex flex-col md:flex-row gap-10 bg-[#F9FAFB] p-8 rounded-3xl border border-light-gray">
                   <div className="text-center md:text-left flex flex-col items-center md:items-start justify-center pr-10 md:border-r border-light-gray">
-                    <h4 className="text-7xl font-display font-black text-primary-blue mb-2">{product.rating}</h4>
+                    <h4 className="text-7xl font-display font-black text-primary-blue mb-2">{product.rating || '0'}</h4>
                     <div className="flex gap-1 mb-2">
                       {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={`w-5 h-5 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-light-gray'}`} />
+                        <Star key={i} className={`w-5 h-5 ${i < Math.floor(product.rating || 0) ? 'text-yellow-400 fill-current' : 'text-light-gray'}`} />
                       ))}
                     </div>
-                    <p className="text-sm text-medium-gray font-medium">{t.basedOn} {product.reviewsCount} {t.verifiedReviews}</p>
+                    <p className="text-sm text-medium-gray font-medium">{t.basedOn} {reviewsTotal} {t.verifiedReviews}</p>
                   </div>
                   
                   <div className="flex-1 space-y-2">
                     {[5, 4, 3, 2, 1].map(star => {
-                      const percentage = star === 5 ? 75 : star === 4 ? 15 : star === 3 ? 5 : 2.5;
+                      const count = ratingDistribution[star] || 0;
+                      const percentage = reviewsTotal > 0 ? (count / reviewsTotal) * 100 : 0;
                       return (
                         <div key={star} className="flex items-center gap-4 text-sm font-bold">
                           <span className="w-16 whitespace-nowrap">{star} {t.stars}</span>
@@ -524,51 +612,89 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
                               className="h-full bg-primary-blue"
                             />
                           </div>
-                          <span className="w-10 text-right opacity-50">{Math.round(product.reviewsCount * (percentage / 100))}</span>
+                          <span className="w-10 text-right opacity-50">{count}</span>
                         </div>
                       )
                     })}
                   </div>
 
                   <div className="flex items-center justify-center">
-                    <button className="px-8 h-14 bg-primary-blue text-white rounded-xl font-display font-bold shadow-xl hover:bg-dark-gray transition-all">
+                    <button 
+                      onClick={() => {
+                        if (!user) {
+                          alert(language === 'fr' ? "Vous devez être connecté pour laisser un avis." : "You must be logged in to leave a review.");
+                        } else {
+                          setShowReviewModal(true);
+                        }
+                      }}
+                      className="px-8 h-14 bg-primary-blue text-white rounded-xl font-display font-bold shadow-xl hover:bg-dark-gray transition-all"
+                    >
                       {t.leaveReview}
                     </button>
                   </div>
                 </div>
 
                 <div className="space-y-6">
-                  {[
-                    { name: 'Jean M.', date: 'Il y a 2 jours', rating: 5, text: 'Vraiment impressionné par la qualité du tissu. La coupe slim fit me va parfaitement. Livraison rapide à Yaoundé !', title: 'Excellente qualité' },
-                    { name: 'Alice K.', date: 'Il y a 1 semaine', rating: 4, text: 'Très jolie chemise, le bleu marine est magnifique. Attention à bien regarder le guide des tailles, j\'ai dû prendre une taille au-dessus.', title: 'Top pour le bureau' }
-                  ].map((review, i) => (
-                    <div key={i} className="p-6 bg-white border border-light-gray rounded-2xl space-y-4 hover:shadow-lg transition-all">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-primary-blue/10 text-primary-blue rounded-full flex items-center justify-center font-bold">
-                            {review.name[0]}
-                          </div>
-                          <div>
-                            <p className="font-bold text-dark-gray">{review.name} <span className="ml-2 px-2 py-0.5 bg-green-50 text-primary-green text-[10px] rounded border border-green-200">{t.verifiedPurchase}</span></p>
-                            <p className="text-xs text-medium-gray">{review.date}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-0.5">
-                          {[...Array(5)].map((_, j) => (
-                            <Star key={j} className={`w-3.5 h-3.5 ${j < review.rating ? 'text-yellow-400 fill-current' : 'text-light-gray'}`} />
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <h5 className="font-bold text-dark-gray">{review.title}</h5>
-                        <p className="text-sm text-medium-gray leading-relaxed">{review.text}</p>
-                        <p className="text-xs text-light-gray italic">Taille achetée : M | Couleur : Bleu Marine</p>
-                      </div>
+                  {reviews.length === 0 ? (
+                    <div className="py-12 text-center bg-white border border-light-gray rounded-2xl">
+                      <Star className="w-10 h-10 text-light-gray mx-auto mb-3" />
+                      <p className="text-sm text-medium-gray font-medium italic">
+                        {language === 'fr' ? "Aucun avis publié pour ce produit. Soyez le premier à donner votre avis !" : "No published reviews for this product. Be the first to leave a review!"}
+                      </p>
                     </div>
-                  ))}
-                  <button className="w-full h-12 border-2 border-light-gray rounded-xl text-dark-gray font-bold hover:bg-light-gray transition-all">
-                    {t.seeMoreReviews}
-                  </button>
+                  ) : (
+                    reviews.map((review) => (
+                      <div key={review.id} className="p-6 bg-white border border-light-gray rounded-2xl space-y-4 hover:shadow-lg transition-all">
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-primary-blue/10 text-primary-blue rounded-full flex items-center justify-center font-bold">
+                              {review.userName ? review.userName[0].toUpperCase() : 'C'}
+                            </div>
+                            <div>
+                              <p className="font-bold text-dark-gray">
+                                {review.userName}{' '}
+                                {review.isVerifiedPurchase && (
+                                  <span className="ml-2 px-2 py-0.5 bg-green-50 text-primary-green text-[10px] rounded border border-green-200">
+                                    {t.verifiedPurchase}
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-medium-gray">{review.date}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-0.5">
+                            {[...Array(5)].map((_, j) => (
+                              <Star key={j} className={`w-3.5 h-3.5 ${j < review.rating ? 'text-yellow-400 fill-current' : 'text-light-gray'}`} />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <h5 className="font-bold text-dark-gray">{review.title}</h5>
+                          <p className="text-sm text-medium-gray leading-relaxed">{review.text || review.comment}</p>
+                          <div className="flex items-center justify-between pt-2 border-t border-light-gray/30">
+                            <p className="text-xs text-light-gray italic">
+                              {review.purchasedVariant ? `${language === 'fr' ? 'Option achetée' : 'Option purchased'} : ${review.purchasedVariant}` : ''}
+                            </p>
+                            <button
+                              onClick={() => handleVoteHelpful(Number(review.id))}
+                              className="flex items-center gap-1.5 px-3 py-1 bg-light-gray/20 hover:bg-light-gray/40 text-[10px] font-bold text-medium-gray rounded-full transition-all"
+                            >
+                              <span>{language === 'fr' ? 'Utile' : 'Helpful'} ({review.helpfulVotes || 0})</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {reviewsPage < reviewsTotalPages && (
+                    <button 
+                      onClick={handleSeeMoreReviews}
+                      disabled={reviewsLoading}
+                      className="w-full h-12 border-2 border-light-gray rounded-xl text-dark-gray font-bold hover:bg-light-gray transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {reviewsLoading ? '...' : t.seeMoreReviews}
+                    </button>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -623,6 +749,140 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ productId 
               ))}
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de Soumission d'Avis */}
+      <AnimatePresence>
+        {showReviewModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Arrière-plan flou */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !submitLoading && setShowReviewModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            {/* Carte du formulaire */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl p-8 shadow-2xl border border-light-gray overflow-hidden z-10"
+            >
+              <button
+                disabled={submitLoading}
+                onClick={() => setShowReviewModal(false)}
+                className="absolute top-6 right-6 p-2 bg-light-gray/50 hover:bg-light-gray rounded-full text-dark-gray transition-all disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h3 className="font-display font-black text-2xl text-dark-gray uppercase tracking-tighter mb-1">
+                {language === 'fr' ? 'Laisser un avis' : 'Leave a review'}
+              </h3>
+              <p className="text-xs text-medium-gray font-medium mb-6">
+                {language === 'fr' ? `Partagez votre expérience sur ${product.name}` : `Share your experience on ${product.name}`}
+              </p>
+
+              {submitSuccess ? (
+                <div className="py-10 text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-50 border border-green-200 text-primary-green rounded-full flex items-center justify-center mx-auto animate-bounce">
+                    <Check className="w-8 h-8" />
+                  </div>
+                  <h4 className="font-bold text-dark-gray">
+                    {language === 'fr' ? 'Merci pour votre avis !' : 'Thank you for your review!'}
+                  </h4>
+                  <p className="text-sm text-medium-gray px-4">
+                    {submitSuccess}
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmitReview} className="space-y-5">
+                  {submitError && (
+                    <div className="p-4 bg-red-50 border border-red-200 text-red-500 rounded-xl text-xs font-bold">
+                      {submitError}
+                    </div>
+                  )}
+
+                  {/* Étoiles interactives */}
+                  <div className="text-center space-y-2">
+                    <label className="text-xs font-bold text-medium-gray uppercase tracking-wider block">
+                      {language === 'fr' ? 'Note globale' : 'Overall rating'}
+                    </label>
+                    <div className="flex gap-2 justify-center">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          type="button"
+                          key={star}
+                          disabled={submitLoading}
+                          onClick={() => setSubmitRating(star)}
+                          onMouseEnter={() => setHoverRating(star)}
+                          onMouseLeave={() => setHoverRating(null)}
+                          className="transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
+                        >
+                          <Star
+                            className={`w-10 h-10 transition-all ${
+                              star <= (hoverRating ?? submitRating)
+                                ? 'text-yellow-400 fill-current scale-105'
+                                : 'text-light-gray'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Titre */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="review-title" className="text-xs font-bold text-medium-gray uppercase tracking-wider">
+                      {language === 'fr' ? "Titre de l'avis (optionnel)" : "Review title (optional)"}
+                    </label>
+                    <input
+                      id="review-title"
+                      type="text"
+                      maxLength={150}
+                      disabled={submitLoading}
+                      value={submitTitle}
+                      onChange={(e) => setSubmitTitle(e.target.value)}
+                      placeholder={language === 'fr' ? "Ex: Très satisfait, Excellent produit..." : "Ex: Great quality, highly recommend..."}
+                      className="w-full h-12 px-4 rounded-xl border border-light-gray focus:outline-none focus:border-primary-blue text-sm"
+                    />
+                  </div>
+
+                  {/* Message */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="review-body" className="text-xs font-bold text-medium-gray uppercase tracking-wider">
+                      {language === 'fr' ? "Votre avis (10 caractères min.)" : "Your review (10 chars min.)"}
+                    </label>
+                    <textarea
+                      id="review-body"
+                      required
+                      minLength={10}
+                      maxLength={2000}
+                      disabled={submitLoading}
+                      rows={4}
+                      value={submitBody}
+                      onChange={(e) => setSubmitBody(e.target.value)}
+                      placeholder={language === 'fr' ? "Rédigez votre avis ici. Décrivez la qualité du produit, la livraison..." : "Write your review here. Describe product quality, delivery..."}
+                      className="w-full p-4 rounded-xl border border-light-gray focus:outline-none focus:border-primary-blue text-sm resize-none"
+                    />
+                  </div>
+
+                  {/* Bouton Envoyer */}
+                  <button
+                    type="submit"
+                    disabled={submitLoading}
+                    className="w-full h-14 bg-primary-blue text-white rounded-xl font-display font-bold shadow-xl shadow-primary-blue/20 hover:bg-dark-gray transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {submitLoading ? '...' : (language === 'fr' ? 'Soumettre mon avis' : 'Submit my review')}
+                  </button>
+                </form>
+              )}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
