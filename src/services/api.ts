@@ -42,8 +42,43 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  timeout: 15_000,
+  timeout: 30_000,  // 30s — laisse le temps au serveur de démarrer
 });
+
+// ─── Utilitaire Retry avec Backoff Exponentiel ────────────────────────────────
+/**
+ * Réessaie une fonction async en cas d'erreur réseau (pas de réponse du serveur).
+ * Utile au démarrage quand Symfony vient de se lancer et n'est pas encore prêt.
+ *
+ * @param fn          La fonction async à réessayer
+ * @param retries     Nombre max de tentatives (défaut: 4)
+ * @param baseDelayMs Délai initial en ms (double à chaque tentative)
+ */
+export async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  retries = 4,
+  baseDelayMs = 800
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      const isNetworkError =
+        axios.isAxiosError(err) &&
+        (!err.response || err.code === 'ECONNABORTED' || err.code === 'ERR_NETWORK');
+
+      // Ne pas réessayer sur les erreurs métier (4xx, 5xx)
+      if (!isNetworkError || attempt === retries) throw err;
+
+      const delay = baseDelayMs * Math.pow(2, attempt); // 800, 1600, 3200, 6400…
+      console.warn(`[retry] Tentative ${attempt + 1}/${retries} échouée, nouvel essai dans ${delay}ms…`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
 
 // ─── Interceptor REQUEST — attache le JWT ─────────────────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -81,6 +116,19 @@ const processQueue = (error: AxiosError | null, token: string | null = null) => 
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    // Détecter les erreurs de connexion ou de dépassement de délai (timeout)
+    const isTimeoutOrNetworkError = 
+      error.code === 'ECONNABORTED' || 
+      error.message?.toLowerCase().includes('timeout') || 
+      error.message?.toLowerCase().includes('network error') ||
+      !error.response;
+
+    if (isTimeoutOrNetworkError) {
+      // On ne modifie pas le message ici pour ne pas masquer le type d'erreur
+      // Le retry est géré par retryWithBackoff au niveau des services
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
     // Ignore les erreurs non-401 ou les routes de login/refresh (évite boucle infinie)

@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AuthUser, userLogin, userRegister, userLogout, getMe, LoginPayload, RegisterPayload } from '../services/authService';
 import { AuthAdmin, adminLogin as apiAdminLogin, adminLogout as apiAdminLogout, AdminLoginPayload, getAdminMe } from '../services/adminAuthService';
 import { getPublicCategories, getPublicProducts, archiveAdminProduct } from '../services/catalogueService';
-import api, { tokenStore } from '../services/api';
+import api, { tokenStore, retryWithBackoff } from '../services/api';
 
 export interface Product {
   id: string;
@@ -115,6 +115,8 @@ export interface StoreSettings {
   deliveryFreeThreshold: number;
   paymentKeys: { mtn: string; orange: string };
   socials: { facebook: string; instagram: string; whatsapp: string; tiktok: string };
+  globalDeliveryPrice: number;
+  useGlobalDeliveryPrice: boolean;
 }
 
 export interface Address {
@@ -128,6 +130,41 @@ export interface Address {
 }
 
 export type Language = 'fr' | 'en';
+
+// ─── Cache localStorage helpers ──────────────────────────────────────────────
+const CATALOG_CACHE_KEY = 'dg_catalog_cache';
+const CATALOG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface CatalogCache {
+  products: Product[];
+  categories: Category[];
+  timestamp: number;
+}
+
+const readCatalogCache = (): CatalogCache | null => {
+  try {
+    const raw = localStorage.getItem(CATALOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: CatalogCache = JSON.parse(raw);
+    // On retourne le cache même s'il est "périmé" — il sera rafraîchi en arrière-plan
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeCatalogCache = (data: Omit<CatalogCache, 'timestamp'>): void => {
+  try {
+    const cache: CatalogCache = { ...data, timestamp: Date.now() };
+    localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Si localStorage est plein ou indisponible, on ignore silencieusement
+  }
+};
+
+const isCacheStale = (cache: CatalogCache): boolean => {
+  return Date.now() - cache.timestamp > CATALOG_CACHE_TTL;
+};
 
 interface AppContextType {
   cart: CartItem[];
@@ -145,6 +182,8 @@ interface AppContextType {
   language: Language;
   /** true pendant la tentative de restauration de session au démarrage */
   authLoading: boolean;
+  /** true pendant le premier chargement du catalogue (pas de cache disponible) */
+  catalogLoading: boolean;
   
   // Client Actions
   setLanguage: (lang: Language) => void;
@@ -187,27 +226,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+
+  // ─── Initialisation avec le cache localStorage (affichage instantané) ────
+  const initialCache = readCatalogCache();
+  const [products, setProducts] = useState<Product[]>(initialCache?.products ?? []);
+  const [categories, setCategories] = useState<Category[]>(initialCache?.categories ?? []);
+  /**
+   * catalogLoading = true UNIQUEMENT si aucun cache n'est disponible.
+   * Si on a un cache (même périmé), on l'affiche immédiatement et on revalide en arrière-plan.
+   */
+  const [catalogLoading, setCatalogLoading] = useState<boolean>(!initialCache);
+  const initialCacheRef = useRef(initialCache);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [language, setLanguage] = useState<Language>('fr');
-  const [settings, setSettings] = useState<StoreSettings>({
-    name: 'Donald Gros',
-    logo: '/logo.png',
-    email: 'contact@donaldgros.com',
-    phone: '+237 600 000 000',
-    address: 'Douala, Cameroun',
-    shipping: [
-      { city: 'Douala', price: 1500, delay: '1-2 jours' },
-      { city: 'Yaoundé', price: 3000, delay: '2-3 jours' },
-      { city: 'Bafoussam', price: 4500, delay: '3-4 jours' },
-    ],
-    deliveryFreeThreshold: 200000,
-    paymentKeys: { mtn: '***', orange: '***' },
-    socials: { facebook: '#', instagram: '#', whatsapp: '#', tiktok: '#' }
+  const [settings, setSettings] = useState<StoreSettings>(() => {
+    try {
+      const cached = localStorage.getItem('dg_store_settings');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // S'assurer que les nouveaux champs existent
+        if (parsed.globalDeliveryPrice === undefined) parsed.globalDeliveryPrice = 2000;
+        if (parsed.useGlobalDeliveryPrice === undefined) parsed.useGlobalDeliveryPrice = false;
+        return parsed;
+      }
+    } catch (e) {
+      console.error('Erreur lecture settings cache:', e);
+    }
+    return {
+      name: 'Donald Gros',
+      logo: '/logo.png',
+      email: 'contact@donaldgros.com',
+      phone: '+237 600 000 000',
+      address: 'Douala, Cameroun',
+      shipping: [
+        { city: 'Douala', price: 1500, delay: '1-2 jours' },
+        { city: 'Yaoundé', price: 3000, delay: '2-3 jours' },
+        { city: 'Bafoussam', price: 4500, delay: '3-4 jours' },
+      ],
+      deliveryFreeThreshold: 200000,
+      paymentKeys: { mtn: '***', orange: '***' },
+      socials: { facebook: '#', instagram: '#', whatsapp: '#', tiktok: '#' },
+      globalDeliveryPrice: 2000,
+      useGlobalDeliveryPrice: false
+    };
   });
 
   // ─── Restauration de session au démarrage ───────────────────────────────────────────
@@ -258,24 +323,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // ─── Chargement initial du catalogue (produits & catégories) ────────────
+  // ─── Chargement du catalogue — Stratégie Stale-While-Revalidate ──────────
+  // 1. Si un cache existe → données affichées immédiatement (catalogLoading=false)
+  // 2. Si le cache est périmé OU absent → requête backend en arrière-plan
+  // 3. Dès que le backend répond → mise à jour du state ET du cache localStorage
+  // 4. Retry automatique (backoff exponentiel) en cas d'erreur réseau au démarrage
   useEffect(() => {
     let cancelled = false;
-    const loadCatalog = async () => {
+    const cache = initialCacheRef.current;
+
+    const loadCatalog = async (isBackground: boolean) => {
       try {
-        const [cats, prodData] = await Promise.all([
-          getPublicCategories(),
-          getPublicProducts({ limit: 100 })
-        ]);
+        // retryWithBackoff réessaie jusqu'à 4 fois si le serveur n'est pas encore prêt
+        const [cats, prodData] = await retryWithBackoff(() =>
+          Promise.all([
+            getPublicCategories(),
+            getPublicProducts({ limit: 20 }),
+          ])
+        );
         if (!cancelled) {
           setCategories(cats);
           setProducts(prodData.products);
+          writeCatalogCache({ products: prodData.products, categories: cats });
         }
       } catch (err) {
-        console.error('Erreur lors du chargement du catalogue:', err);
+        console.error('Erreur lors du chargement du catalogue (toutes tentatives échouées):', err);
+      } finally {
+        if (!cancelled && !isBackground) {
+          setCatalogLoading(false);
+        }
       }
     };
-    loadCatalog();
+
+    if (!cache) {
+      loadCatalog(false);
+    } else if (isCacheStale(cache)) {
+      loadCatalog(true);
+    }
+    // Cache frais → rien à faire, données déjà dans le state
+
     return () => {
       cancelled = true;
     };
@@ -445,16 +531,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const updateSettings = (newSettings: StoreSettings) => setSettings(newSettings);
+  const updateSettings = (newSettings: StoreSettings) => {
+    setSettings(newSettings);
+    try {
+      localStorage.setItem('dg_store_settings', JSON.stringify(newSettings));
+    } catch (e) {
+      console.error('Erreur écriture settings cache:', e);
+    }
+  };
 
   const refreshCatalog = async () => {
     try {
       const [cats, prodData] = await Promise.all([
         getPublicCategories(),
-        getPublicProducts({ limit: 100 })
+        getPublicProducts({ limit: 20 })
       ]);
       setCategories(cats);
       setProducts(prodData.products);
+      writeCatalogCache({ products: prodData.products, categories: cats });
     } catch (err) {
       console.error('Erreur lors du rechargement du catalogue:', err);
     }
@@ -464,7 +558,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{ 
       cart, wishlist, user, adminUser, products,
       orders, addresses, reviews, categories, promotions, settings, language,
-      authLoading,
+      authLoading, catalogLoading,
       setLanguage,
       addToCart, removeFromCart, updateQuantity, 
       toggleWishlist, login, register, logout, getProductById,

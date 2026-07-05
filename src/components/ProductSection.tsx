@@ -140,15 +140,6 @@ export const ProductSection = ({
   badgeType?: string;
 }) => {
   const { language } = useAppContext();
-  const scrollRef = React.useRef<HTMLDivElement>(null);
-
-  const scroll = (direction: 'left' | 'right') => {
-    if (scrollRef.current) {
-      const { scrollLeft, clientWidth } = scrollRef.current;
-      const scrollTo = direction === 'left' ? scrollLeft - clientWidth : scrollLeft + clientWidth;
-      scrollRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
-    }
-  };
 
   return (
     <section className="max-w-[1600px] mx-auto px-4 md:px-8 py-10 md:py-16">
@@ -158,45 +149,17 @@ export const ProductSection = ({
           <p className="text-medium-gray text-xs sm:text-sm md:text-[15px] mt-1">{subtitle}</p>
         </div>
         <div className="hidden md:flex items-center gap-4 shrink-0">
-          <a href="#" className="flex items-center gap-1 text-primary-blue font-semibold hover:underline group">
+          <a href="#catalogue" className="flex items-center gap-1 text-primary-blue font-semibold hover:underline group">
             {language === 'fr' ? 'Voir tout' : 'View all'} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </a>
-          <div className="flex items-center gap-2 ml-4">
-            <button onClick={() => scroll('left')} className="p-2 border border-light-gray rounded-full hover:bg-light-gray transition-colors">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button onClick={() => scroll('right')} className="p-2 border border-light-gray rounded-full hover:bg-light-gray transition-colors">
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Mobile: 2-column grid | Desktop: horizontal scroll */}
-      {/* Mobile Grid */}
-      <div className="grid grid-cols-2 gap-3 sm:hidden">
-        {products.slice(0, 6).map((p) => (
+      {/* Grille de 4 produits de taille augmentée */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
+        {products.slice(0, 4).map((p) => (
           <ProductCard key={p.id} product={{...p, badge: badgeType}} />
         ))}
-      </div>
-
-      {/* Tablet + Desktop: horizontal scroll */}
-      <div 
-        ref={scrollRef}
-        className="hidden sm:flex gap-4 md:gap-6 lg:gap-10 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar scroll-smooth"
-      >
-        {products.map((p) => (
-          <div key={p.id} className="snap-start shrink-0 w-[200px] md:w-[260px] lg:w-[280px]">
-            <ProductCard product={{...p, badge: badgeType}} />
-          </div>
-        ))}
-      </div>
-
-      {/* Mobile "See all" link */}
-      <div className="sm:hidden flex justify-center mt-4">
-        <a href="#catalogue" className="flex items-center gap-1 text-primary-blue font-bold text-sm hover:underline">
-          {language === 'fr' ? 'Voir tout le catalogue' : 'View full catalog'} <ArrowRight className="w-4 h-4" />
-        </a>
       </div>
     </section>
   );

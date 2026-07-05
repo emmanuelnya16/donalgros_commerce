@@ -125,3 +125,56 @@ export const SkeletonGrid: React.FC<{ count?: number }> = ({ count = 6 }) => (
     </div>
   </div>
 );
+/**
+ * SkeletonSection — Skeleton for a horizontal product grid section (home page)
+ */
+export const SkeletonSection: React.FC<{ count?: number }> = ({ count = 4 }) => (
+  <section className="max-w-[1600px] mx-auto px-4 md:px-8 py-10 md:py-16">
+    {/* Header */}
+    <div className="flex items-end justify-between mb-6 md:mb-8 border-b border-gray-100 pb-4">
+      <div className="space-y-2">
+        <div className="h-7 bg-gray-200 rounded-lg w-48 animate-pulse" />
+        <div className="h-4 bg-gray-100 rounded w-72 animate-pulse" />
+      </div>
+      <div className="hidden md:flex items-center">
+        <div className="w-24 h-5 bg-gray-100 rounded animate-pulse" />
+      </div>
+    </div>
+    {/* Responsive Grid layout to match ProductSection */}
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
+      {Array.from({ length: Math.min(count, 4) }).map((_, i) => (
+        <SkeletonCard key={i} />
+      ))}
+    </div>
+  </section>
+);
+
+/**
+ * SkeletonCategoryRow — Skeleton for the category grid / chips row
+ */
+export const SkeletonCategoryRow: React.FC<{ count?: number }> = ({ count = 6 }) => (
+  <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-6">
+    <div className="flex gap-3 overflow-hidden">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="shrink-0 w-24 h-24 md:w-32 md:h-32 bg-gray-100 rounded-2xl animate-pulse"
+          style={{ animationDelay: `${i * 80}ms` }}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+/**
+ * BackgroundRefreshBadge — Shows a subtle indicator when data is being refreshed in the background
+ */
+export const BackgroundRefreshBadge: React.FC = () => (
+  <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 bg-white/90 backdrop-blur-md border border-gray-100 shadow-lg rounded-full px-3 py-1.5 text-xs text-gray-500 font-medium">
+    <svg className="w-3 h-3 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" />
+      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+    Mise à jour...
+  </div>
+);

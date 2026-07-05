@@ -19,6 +19,7 @@ import {
   User
 } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
+import { fetchOrders } from '../../services/adminOrderService';
 
 // --- SIDEBAR COMPONENT ---
 export const AdminSidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActiveTab }: { 
@@ -27,7 +28,51 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActive
   activeTab: string,
   setActiveTab: (t: string) => void
 }) => {
-  const { adminLogout, adminUser } = useAppContext();
+  const { adminLogout, adminUser, reviews } = useAppContext();
+  const [ordersBadge, setOrdersBadge] = React.useState<number>(0);
+
+  // Charger le compteur de commandes en attente d'action
+  React.useEffect(() => {
+    if (!adminUser) return;
+    let active = true;
+
+    const loadOrderStats = async () => {
+      try {
+        const res = await fetchOrders({ limit: 1 });
+        if (!active) return;
+        
+        // On compte les commandes qui requièrent une attention
+        // (confirmées, en préparation, paiement à la livraison, en attente de paiement)
+        const stats = res.stats;
+        if (stats) {
+          const totalPending = 
+            (stats.confirmed || 0) + 
+            (stats.processing || 0) + 
+            (stats.pending_cod || 0) +
+            (stats.pending_payment || 0);
+          setOrdersBadge(totalPending);
+        } else {
+          setOrdersBadge(res.total || 0);
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des statistiques de commandes pour la sidebar:', err);
+      }
+    };
+
+    loadOrderStats();
+    // Rafraîchir toutes les 30 secondes
+    const interval = setInterval(loadOrderStats, 30000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [adminUser]);
+
+  // Avis en attente (pending)
+  const pendingReviewsCount = reviews.length > 0
+    ? reviews.filter(r => r.status === 'pending').length
+    : 2; // Valeur simulée par défaut s'il n'y a pas d'avis réels chargés
 
   const menuItems = [
     { section: 'GENERAL', items: [
@@ -39,12 +84,12 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActive
       { id: 'stocks', label: 'Stocks', icon: Package },
     ]},
     { section: 'VENTES', items: [
-      { id: 'orders', label: 'Commandes', icon: ShoppingCart, badge: 3 },
+      { id: 'orders', label: 'Commandes', icon: ShoppingCart, badge: ordersBadge > 0 ? ordersBadge : undefined },
       { id: 'clients', label: 'Clients', icon: Users },
       { id: 'promotions', label: 'Promotions', icon: Ticket },
     ]},
     { section: 'CONTENU', items: [
-      { id: 'reviews', label: 'Avis Clients', icon: Star, badge: 12 },
+      { id: 'reviews', label: 'Avis Clients', icon: Star, badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined },
       { id: 'content', label: 'Gestion Site', icon: Monitor },
     ]},
     { section: 'SYSTEME', items: [

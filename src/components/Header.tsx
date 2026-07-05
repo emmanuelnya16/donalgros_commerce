@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Heart, User, ShoppingCart, Globe, Menu, X, ChevronRight, LogOut, Package, MapPin, Calculator, Trash2 } from 'lucide-react';
+import { Search, Heart, User, ShoppingCart, Menu, X, ChevronRight, LogOut, Package, MapPin, Calculator, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppContext } from '../context/AppContext';
 
@@ -62,10 +62,7 @@ export const Header = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-4 md:gap-6">
-            <button className="hidden md:flex items-center gap-1 text-dark-gray hover:text-primary-blue transition-colors relative">
-              <Globe className="w-6 h-6" />
-            </button>
-            
+
             {/* Search Icon - Mobile Only */}
             <button 
               onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}

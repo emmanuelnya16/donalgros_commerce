@@ -10,8 +10,9 @@ import { Header } from './components/Header';
 import { Trash2, Plus, Minus, ArrowLeft, ShoppingCart, Heart, Package, ShieldCheck, Truck, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations } from './translations';
-import { PageLoader } from './components/LoadingComponents';
+import { PageLoader, SkeletonSection, SkeletonCategoryRow } from './components/LoadingComponents';
 import { getNewArrivals, getBestSellers } from './services/catalogueService';
+import { retryWithBackoff } from './services/api';
 
 // ─── Lazy-loaded heavy page components ───
 const HeroBanner = React.lazy(() => import('./components/HeroBanner').then(m => ({ default: m.HeroBanner })));
@@ -30,27 +31,35 @@ const CustomerSpace = React.lazy(() => import('./components/CustomerSpace').then
 const AdminLayout = React.lazy(() => import('./components/admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
 
 function HomePage() {
-  const { language } = useAppContext();
+  const { language, catalogLoading } = useAppContext();
   const [newArrivals, setNewArrivals] = React.useState<Product[]>([]);
   const [bestSellers, setBestSellers] = React.useState<Product[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [sectionsLoading, setSectionsLoading] = React.useState(true);
 
   React.useEffect(() => {
     let active = true;
     const fetchSections = async () => {
       try {
-        const [arrivals, sellers] = await Promise.all([
-          getNewArrivals(8),
-          getBestSellers(8)
-        ]);
+        // Décalage de 300ms pour laisser le catalogue se charger en premier
+        // et ne pas saturer Symfony avec trop de requêtes simultanées
+        await new Promise((r) => setTimeout(r, 300));
+        if (!active) return;
+
+        // Retry automatique en cas d'erreur réseau (serveur pas encore prêt)
+        const [arrivals, sellers] = await retryWithBackoff(() =>
+          Promise.all([
+            getNewArrivals(8),
+            getBestSellers(8),
+          ])
+        );
         if (active) {
           setNewArrivals(arrivals);
           setBestSellers(sellers);
         }
       } catch (err) {
-        console.error('Erreur lors du chargement des sections accueil:', err);
+        console.error('Erreur lors du chargement des sections accueil (toutes tentatives échouées):', err);
       } finally {
-        if (active) setLoading(false);
+        if (active) setSectionsLoading(false);
       }
     };
     fetchSections();
@@ -64,14 +73,17 @@ function HomePage() {
       </React.Suspense>
       <PromotionalMarquee />
       <React.Suspense fallback={<div className="h-40" />}>
-        <CategoryGrid />
+        {catalogLoading ? <SkeletonCategoryRow count={7} /> : <CategoryGrid />}
       </React.Suspense>
       
-      {loading ? (
-        <div className="py-12 text-center text-medium-gray font-bold animate-pulse">Chargement de la collection...</div>
+      {sectionsLoading ? (
+        <>
+          <SkeletonSection count={5} />
+          <SkeletonSection count={5} />
+        </>
       ) : (
         <>
-          <React.Suspense fallback={<PageLoader />}>
+          <React.Suspense fallback={<SkeletonSection count={5} />}>
             <ProductSection 
               title={language === 'fr' ? "Nouveaux Arrivages" : "New Arrivals"} 
               subtitle={language === 'fr' ? "Les dernières pièces ajoutées au catalogue" : "The latest items added to the catalog"} 
@@ -82,7 +94,7 @@ function HomePage() {
           <React.Suspense fallback={<div className="h-60" />}>
             <IntermediaryBanner />
           </React.Suspense>
-          <React.Suspense fallback={<PageLoader />}>
+          <React.Suspense fallback={<SkeletonSection count={5} />}>
             <ProductSection 
               title={language === 'fr' ? "Meilleures Ventes" : "Best Sellers"} 
               subtitle={language === 'fr' ? "Les produits les plus populaires de la semaine" : "The most popular products of the week"} 
@@ -320,6 +332,21 @@ function AppContent() {
 
       {/* Floating Action Buttons */}
       <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
+        {/* Floating WhatsApp Button */}
+        <motion.a
+          href="https://wa.me/237696001685?text=Bonjour,%20j'aimerais%20avoir%20des%20informations%20sur%20les%20produits%20de%20Donald%20Gros."
+          target="_blank"
+          rel="noopener noreferrer"
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-12 h-12 bg-[#25D366] text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all transform hover:-translate-y-1"
+          title="Nous contacter sur WhatsApp"
+        >
+          <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.62.962 3.238 1.45 4.82 1.452 5.432 0 9.85-4.42 9.853-9.857.002-2.633-1.02-5.107-2.88-6.968C16.58 1.96 14.103.938 11.999.938c-5.441 0-9.859 4.42-9.863 9.858-.001 1.762.483 3.486 1.4 5.02L2.527 21.1l5.12-1.946zm11.366-6.126c-.3-.15-1.77-.875-2.04-.975-.27-.1-.466-.15-.66.15-.195.3-.755.975-.927 1.17-.172.195-.344.22-.644.07-1.127-.565-1.947-.973-2.705-2.27-.19-.33.19-.307.545-1.013.09-.184.045-.347-.023-.497-.067-.15-.66-1.59-.904-2.18-.24-.575-.48-.495-.66-.504-.17-.008-.363-.01-.557-.01-.19 0-.507.07-.773.356-.265.285-1.012.99-1.012 2.412s1.035 2.784 1.18 2.977c.145.195 2.036 3.11 4.93 4.364.688.3 1.224.478 1.644.612.69.22 1.32.19 1.815.115.55-.083 1.77-.72 2.02-1.417.25-.7 1.02-2.037.93-2.185-.09-.15-.3-.22-.6-.37z"/>
+          </svg>
+        </motion.a>
+
         <AnimatePresence>
           {showBackToTop && (
             <motion.button

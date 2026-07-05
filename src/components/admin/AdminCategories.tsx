@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { FolderTree, Plus, Edit3, Trash2, X, Save, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { FolderTree, Plus, Edit3, Trash2, X, Save, ArrowRight, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import {
   getAdminCategories,
@@ -42,6 +42,14 @@ export const AdminCategories = () => {
   const [position, setPosition] = React.useState(0);
   const [isActive, setIsActive] = React.useState(true);
   const [formError, setFormError] = React.useState('');
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' | null }>({ message: '', type: null });
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast({ message: '', type: null });
+    }, 4000);
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -118,7 +126,7 @@ export const AdminCategories = () => {
         await refreshCatalog();
       } catch (err: any) {
         const msg = err.response?.data?.message || 'Impossible de supprimer cette catégorie (elle contient peut-être des produits ou des sous-catégories).';
-        alert(msg);
+        showToast(msg, 'error');
       }
     }
   };
@@ -132,6 +140,29 @@ export const AdminCategories = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Alert */}
+      <AnimatePresence>
+        {toast.message && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className={`fixed top-6 right-6 z-[999] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border text-sm font-bold uppercase tracking-wider
+              ${toast.type === 'success' 
+                ? 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/20' 
+                : 'bg-red-500 text-white border-red-400 shadow-red-500/20'
+              }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 shrink-0" />
+            ) : (
+              <XCircle className="w-5 h-5 shrink-0" />
+            )}
+            <span>{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

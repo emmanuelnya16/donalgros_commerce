@@ -108,6 +108,14 @@ export const AdminCatalog = () => {
 
   // General Error message
   const [formError, setFormError] = React.useState('');
+  const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'error' | null }>({ message: '', type: null });
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast({ message: '', type: null });
+    }, 4000);
+  };
 
   const formatDateTimeLocal = (dateStr: any) => {
     if (!dateStr) return '';
@@ -192,7 +200,7 @@ export const AdminCatalog = () => {
       setIsFormOpen(true);
     } catch (err) {
       console.error('Erreur chargement details produit:', err);
-      alert('Impossible de charger les détails de ce produit.');
+      showToast('Impossible de charger les détails de ce produit.', 'error');
     } finally {
       setLoading(false);
     }
@@ -272,7 +280,7 @@ export const AdminCatalog = () => {
       const ids = newList.map(img => img.id);
       await reorderProductImages(editingProduct.id, ids);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erreur lors du réordonnancement des images');
+      showToast(err.response?.data?.message || 'Erreur lors du réordonnancement des images', 'error');
       // reload original images
       const details = await getAdminProductDetail(editingProduct.id);
       setImagesList(details.images || []);
@@ -328,9 +336,9 @@ export const AdminCatalog = () => {
       
       const details = await getAdminProductDetail(editingProduct.id);
       setImagesList(details.images || []);
-      alert('Toutes les images ont été téléversées avec succès.');
+      showToast('Toutes les images ont été téléversées avec succès.', 'success');
     } catch (err: any) {
-      alert(err.response?.data?.message || "Erreur de téléversement de l'une des images");
+      showToast(err.response?.data?.message || "Erreur de téléversement de l'une des images", 'error');
     } finally {
       setUploadingImage(false);
     }
@@ -343,7 +351,7 @@ export const AdminCatalog = () => {
       const details = await getAdminProductDetail(editingProduct.id);
       setImagesList(details.images || []);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erreur lors de la modification de l\'image principale');
+      showToast(err.response?.data?.message || 'Erreur lors de la modification de l\'image principale', 'error');
     }
   };
 
@@ -355,7 +363,7 @@ export const AdminCatalog = () => {
         const details = await getAdminProductDetail(editingProduct.id);
         setImagesList(details.images || []);
       } catch (err: any) {
-        alert(err.response?.data?.message || 'Erreur lors de la suppression de l\'image');
+        showToast(err.response?.data?.message || 'Erreur lors de la suppression de l\'image', 'error');
       }
     }
   };
@@ -412,13 +420,13 @@ export const AdminCatalog = () => {
           pendingUploads.forEach(u => URL.revokeObjectURL(u.previewUrl));
           setPendingUploads([]);
         } catch (err: any) {
-          alert("Le produit a bien été enregistré, mais une erreur est survenue lors du téléversement de certaines images.");
+          showToast("Le produit a bien été enregistré, mais une erreur est survenue lors du téléversement de certaines images.", "error");
         } finally {
           setUploadingImage(false);
         }
       }
 
-      alert('Produit enregistré avec succès.');
+      showToast('Produit enregistré avec succès.', 'success');
       setIsFormOpen(false);
       await loadData();
       await refreshCatalog();
@@ -458,6 +466,29 @@ export const AdminCatalog = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Alert */}
+      <AnimatePresence>
+        {toast.message && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className={`fixed top-6 right-6 z-[999] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border text-sm font-bold uppercase tracking-wider
+              ${toast.type === 'success' 
+                ? 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/20' 
+                : 'bg-red-500 text-white border-red-400 shadow-red-500/20'
+              }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 shrink-0" />
+            ) : (
+              <XCircle className="w-5 h-5 shrink-0" />
+            )}
+            <span>{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header with Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

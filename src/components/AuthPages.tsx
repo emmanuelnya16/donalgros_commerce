@@ -173,7 +173,7 @@ export const AuthPages: React.FC<AuthProps> = ({ mode, onSwitch }) => {
                       <label className="text-sm font-bold text-dark-gray block">{t.passwordLabel}</label>
                       <div className={wrapClass}>
                         <Lock className="absolute left-3 w-4 h-4 text-medium-gray" />
-                        <input type={showPassword ? 'text' : 'password'} required placeholder="••••••••"
+                        <input type={showPassword ? 'text' : 'password'} required placeholder="••••••"
                           className="w-full h-full pl-10 pr-12 outline-none text-sm font-medium"
                           value={formData.password}
                           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -259,7 +259,7 @@ export const AuthPages: React.FC<AuthProps> = ({ mode, onSwitch }) => {
                       <label className="text-sm font-bold text-dark-gray block">{t.passwordLabel}</label>
                       <div className={`${wrapClass} overflow-hidden`}>
                         <Lock className="absolute left-3 w-4 h-4 text-medium-gray" />
-                        <input type={showPassword ? 'text' : 'password'} required placeholder="••••••••"
+                        <input type={showPassword ? 'text' : 'password'} required placeholder="••••••"
                           className="w-full h-full pl-10 pr-12 outline-none text-sm font-medium"
                           value={formData.password}
                           onChange={(e) => setFormData({ ...formData, password: e.target.value })}

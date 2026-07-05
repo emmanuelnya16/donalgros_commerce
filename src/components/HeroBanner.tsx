@@ -169,59 +169,40 @@ export const CategoryGrid = () => {
   ];
 
   return (
-    <section className="max-w-[1600px] mx-auto px-4 md:px-8 py-12 md:py-20">
-      <div className="text-center mb-12">
-        <h2 className="text-3xl md:text-4xl font-display font-black text-dark-gray mb-3">
+    <section className="max-w-[1600px] mx-auto px-4 md:px-8 py-6 md:py-8">
+      <div className="text-center mb-5">
+        <h2 className="text-xl md:text-2xl font-display font-black text-dark-gray mb-1">
           {language === 'fr' ? 'Nos Univers' : 'Our Universes'}
         </h2>
-        <p className="text-medium-gray text-[16px]">
-          {language === 'fr' ? 'Explorez nos catégories et trouvez ce qui vous correspond' : 'Explore our categories and find what fits you best'}
+        <p className="text-medium-gray text-[13px]">
+          {language === 'fr' ? 'Explorez nos catégories' : 'Explore our categories'}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-6">
-        <div className="grid grid-cols-2 gap-4 md:gap-6 col-span-2">
-          {CATEGORIES.slice(0, 2).map((cat) => (
-            <CategoryCard key={cat.id} {...cat} />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-10 gap-4 md:gap-6 col-span-2">
-          <div className="md:col-span-4">
-            <CategoryCard {...CATEGORIES[2]} />
-          </div>
-          <div className="md:col-span-6">
-            <CategoryCard {...CATEGORIES[3]} />
-          </div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {CATEGORIES.map((cat) => (
+          <CategoryCard key={cat.id} {...cat} />
+        ))}
       </div>
     </section>
   );
 };
 
-const CategoryCard = ({ id, name, count, image }: any) => {
-  const { language } = useAppContext();
-  
-  const handleClick = () => {
-    window.location.hash = `catalogue?category=${id}`;
-  };
-
+const CategoryCard = ({ name, image }: any) => {
   return (
     <div 
-      onClick={handleClick}
-      className="group relative overflow-hidden rounded-xl cursor-pointer bg-light-gray h-full min-h-[160px] md:min-h-[220px]"
+      className="group relative overflow-hidden rounded-xl bg-light-gray h-28 md:h-36"
     >
       <img
         src={image}
         alt={name}
         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-      <div className="absolute bottom-0 left-0 p-6 w-full">
-        <h3 className="text-xl md:text-2xl font-display font-bold text-white mb-1 uppercase">{name}</h3>
-        <p className="text-white/70 text-sm mb-4">{count} {language === 'fr' ? 'produits' : 'products'}</p>
-        <button className="hidden md:inline-block px-5 py-2 bg-white/20 border border-white/30 text-white text-sm font-medium rounded-lg opacity-0 transform translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-white hover:text-dark-gray backdrop-blur-sm">
-          {language === 'fr' ? 'Explorer' : 'Explore'}
-        </button>
+      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors duration-300" />
+      <div className="absolute inset-0 flex items-center justify-center p-3 text-center">
+        <h3 className="text-base md:text-lg font-display font-black text-white uppercase tracking-wider drop-shadow-md">
+          {name}
+        </h3>
       </div>
     </div>
   );
