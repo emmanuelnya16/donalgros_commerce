@@ -22,7 +22,9 @@ export default defineConfig(({mode}) => {
       // Proxy /api → backend Symfony (évite les problèmes CORS en développement)
       proxy: {
         '/api': {
-          target: env.VITE_API_URL || 'http://localhost:8000',
+          target: env.VITE_API_URL 
+            ? (env.VITE_API_URL.startsWith('http') ? env.VITE_API_URL : `https://${env.VITE_API_URL}`) 
+            : 'http://localhost:8000',
           changeOrigin: true,
           secure: false,
         },
