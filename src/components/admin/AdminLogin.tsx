@@ -19,8 +19,12 @@ export const AdminLogin = () => {
 
     try {
       // Appelle POST /api/admin/auth/login via le contexte
-      await adminLogin({ email, password });
-      window.location.hash = 'admin/dashboard';
+      const admin = await adminLogin({ email, password });
+      if (admin.role === 'ROLE_MANAGER') {
+        window.location.hash = 'admin/products';
+      } else {
+        window.location.hash = 'admin/dashboard';
+      }
     } catch (err) {
       setError(extractErrorMessage(err, 'Identifiants invalides ou accès non autorisé.'));
     } finally {

@@ -36,19 +36,20 @@ export const CataloguePage = () => {
   const [priceRange, setPriceRange] = React.useState([0, 1500000]);
   const [compareItems, setCompareItems] = React.useState<string[]>([]);
   const [sortBy, setSortBy] = React.useState('pertinence');
-  const [activeTab, setActiveTab] = React.useState(language === 'fr' ? 'Tous' : 'All');
   const [selectedBrands, setSelectedBrands] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     const handleHashChange = () => {
-      const params = new URLSearchParams(window.location.hash.split('?')[1]);
+      const hash = window.location.hash;
+      const params = new URLSearchParams(hash.split('?')[1] || '');
       const q = params.get('q');
       const cat = params.get('category');
       if (q !== null) setSearchQuery(q);
+      else if (hash.startsWith('#catalogue') && !params.has('q')) setSearchQuery('');
+
       if (cat !== null) setSelectedCategory(cat);
-      if (!cat && !q && window.location.hash === '#catalogue') {
+      else if (hash === '#catalogue' || hash === '' || (hash.startsWith('#catalogue') && !params.has('category'))) {
         setSelectedCategory(null);
-        setSearchQuery('');
       }
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -66,8 +67,23 @@ export const CataloguePage = () => {
           sortBy === 'prix-decroissant' || sortBy === 'price-desc' ? 'price-desc' :
           sortBy === 'nouveautes' || sortBy === 'newest' ? 'newest' : undefined;
 
+        // Resolve matched category slug/ID
+        const matchedCat = selectedCategory
+          ? categories.find(
+              c =>
+                c.slug?.toLowerCase() === selectedCategory.toLowerCase() ||
+                String(c.id) === String(selectedCategory) ||
+                c.name.toLowerCase() === selectedCategory.toLowerCase()
+            )
+          : null;
+
+        const isNumeric = selectedCategory && /^\d+$/.test(selectedCategory);
+        const catSlug = matchedCat?.slug || (!isNumeric ? selectedCategory || undefined : undefined);
+        const catId = matchedCat ? Number(matchedCat.id) : (isNumeric ? Number(selectedCategory) : undefined);
+
         const data = await getPublicProducts({
-          categorySlug: selectedCategory || undefined,
+          categorySlug: catSlug,
+          categoryId: catSlug ? undefined : catId,
           search: searchQuery || undefined,
           sortBy: mappedSort,
           page: currentPage,
@@ -87,7 +103,7 @@ export const CataloguePage = () => {
     };
     fetchFiltered();
     return () => { active = false; };
-  }, [selectedCategory, searchQuery, sortBy, currentPage]);
+  }, [selectedCategory, searchQuery, sortBy, currentPage, categories]);
 
   const filteredProducts = React.useMemo(() => {
     let result = [...dbProducts];
@@ -96,18 +112,11 @@ export const CataloguePage = () => {
     result = result.filter(p => {
       if (p.price > priceRange[1]) return false;
       if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand)) return false;
-
-      const isAll = activeTab === 'Tous' || activeTab === 'All';
-      if (!isAll) {
-        if ((activeTab === 'Nouveautés' || activeTab === 'New') && p.badge !== 'NOUVEAU' && p.badge !== 'NEW') return false; 
-        if ((activeTab === 'Premium') && p.price < 100000) return false;
-        if ((activeTab === 'Soldes' || activeTab === 'Sale' || activeTab === 'Deals') && !p.originalPrice) return false;
-      }
       return true;
     });
 
     return result;
-  }, [dbProducts, priceRange, selectedBrands, activeTab]);
+  }, [dbProducts, priceRange, selectedBrands]);
 
   const toggleBrand = (brand: string) => {
     setSelectedBrands(prev => prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]);
@@ -123,11 +132,22 @@ export const CataloguePage = () => {
     setSelectedCategory(id);
     setSearchQuery('');
     setCurrentPage(1);
+    if (id) {
+      window.location.hash = `catalogue?category=${encodeURIComponent(id)}`;
+    } else {
+      window.location.hash = 'catalogue';
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const currentCategoryObj = React.useMemo(() => {
-    return categories.find(c => c.slug === selectedCategory || c.id === selectedCategory || c.name.toLowerCase() === selectedCategory?.toLowerCase());
+    if (!selectedCategory) return null;
+    const lower = selectedCategory.toLowerCase();
+    return categories.find(c => 
+      c.slug?.toLowerCase() === lower || 
+      String(c.id) === String(selectedCategory) || 
+      c.name.toLowerCase() === lower
+    ) || null;
   }, [categories, selectedCategory]);
 
   const { rootCategory, subCategories } = React.useMemo(() => {
@@ -138,11 +158,11 @@ export const CataloguePage = () => {
       if (!currentCategoryObj.parentId) {
         // It's a root category
         root = currentCategoryObj;
-        subs = categories.filter(c => c.parentId === root.id);
+        subs = categories.filter(c => String(c.parentId) === String(root.id));
       } else {
         // It's a subcategory
-        root = categories.find(c => c.id === currentCategoryObj.parentId) || null;
-        subs = categories.filter(c => c.parentId === currentCategoryObj.parentId);
+        root = categories.find(c => String(c.id) === String(currentCategoryObj.parentId)) || null;
+        subs = categories.filter(c => String(c.parentId) === String(currentCategoryObj.parentId));
       }
     } else {
       // No category selected, show root categories
@@ -241,12 +261,33 @@ export const CataloguePage = () => {
 
       {/* Category Banner/Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-xs text-medium-gray mb-4">
-          <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); }} className="hover:text-primary-blue">{t.home}</button>
+        <div className="flex items-center flex-wrap gap-2 text-xs text-medium-gray mb-4">
+          <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); window.location.hash = ''; }} className="hover:text-primary-blue">{t.home}</button>
           <ChevronRight className="w-3 h-3" />
-          <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); }} className="hover:text-primary-blue">{t.catalog}</button>
-          <ChevronRight className="w-3 h-3" />
-          <span className="text-dark-gray font-semibold capitalize">{selectedCategory || (searchQuery ? `${t.resultsFor} "${searchQuery}"` : '')}</span>
+          <button onClick={() => { handleCategoryClick(null); }} className="hover:text-primary-blue">{t.catalog}</button>
+          {rootCategory && (
+            <>
+              <ChevronRight className="w-3 h-3" />
+              <button 
+                onClick={() => handleCategoryClick(rootCategory.slug || rootCategory.id)} 
+                className={`hover:text-primary-blue capitalize font-medium ${!currentCategoryObj?.parentId ? 'text-dark-gray font-bold' : ''}`}
+              >
+                {rootCategory.name}
+              </button>
+            </>
+          )}
+          {currentCategoryObj && currentCategoryObj.parentId && (
+            <>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-dark-gray font-bold capitalize">{currentCategoryObj.name}</span>
+            </>
+          )}
+          {!currentCategoryObj && (selectedCategory || searchQuery) && (
+            <>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-dark-gray font-bold capitalize">{selectedCategory || `${t.resultsFor} "${searchQuery}"`}</span>
+            </>
+          )}
         </div>
         
         {selectedCategory && (
@@ -265,7 +306,7 @@ export const CataloguePage = () => {
               <h1 className="text-2xl font-display font-black text-dark-gray">{t.resultsFor} : <span className="text-primary-blue">"{searchQuery}"</span></h1>
               <p className="text-medium-gray">{t.matchFound} {totalProducts} {t.productsFoundShort}</p>
               <button 
-                onClick={() => setSearchQuery('')}
+                onClick={() => { setSearchQuery(''); window.location.hash = 'catalogue'; }}
                 className="mt-2 text-sm text-primary-blue font-bold flex items-center gap-1 hover:underline"
               >
                  <X className="w-4 h-4" /> {language === 'fr' ? 'Annuler la recherche' : 'Cancel search'}
@@ -282,17 +323,101 @@ export const CataloguePage = () => {
            />
         </div>
 
-        {/* Sub-nav pills */}
-        <div className="flex overflow-x-auto gap-2 pb-4 no-scrollbar">
-           {(language === 'fr' ? ['Tous', 'Nouveautés', 'Premium', 'Soldes'] : ['All', 'Newest', 'Premium', 'Sale']).map((pill) => (
-             <button 
-                key={pill} 
-                onClick={() => setActiveTab(pill)}
-                className={`px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${activeTab === pill ? 'bg-primary-blue text-white shadow-lg' : 'bg-light-gray hover:bg-white border border-transparent hover:border-primary-blue'}`}
-             >
-               {pill}
-             </button>
-           ))}
+        {/* Sub-nav pills: Subcategories of selected category */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-4 pt-1 no-scrollbar">
+          {rootCategory ? (
+            <>
+              {/* Button "Tous" for root category */}
+              <button 
+                onClick={() => handleCategoryClick(rootCategory.slug || rootCategory.id)}
+                className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                  selectedCategory === rootCategory.slug || 
+                  selectedCategory === rootCategory.id || 
+                  (!currentCategoryObj?.parentId && selectedCategory?.toLowerCase() === rootCategory.name.toLowerCase())
+                    ? 'bg-primary-blue text-white shadow-lg shadow-primary-blue/25 scale-[1.02]' 
+                    : 'bg-light-gray/80 text-dark-gray hover:bg-white hover:text-primary-blue border border-transparent hover:border-primary-blue/30'
+                }`}
+              >
+                <span>{language === 'fr' ? `Tous (${rootCategory.name})` : `All (${rootCategory.name})`}</span>
+                {rootCategory.productCount > 0 && (
+                  <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                    selectedCategory === rootCategory.slug || selectedCategory === rootCategory.id || (!currentCategoryObj?.parentId && selectedCategory?.toLowerCase() === rootCategory.name.toLowerCase())
+                      ? 'bg-white/20 text-white' 
+                      : 'bg-white text-medium-gray shadow-sm'
+                  }`}>
+                    {rootCategory.productCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Each Subcategory pill */}
+              {subCategories.map((sub) => {
+                const isSubActive = 
+                  selectedCategory === sub.slug || 
+                  selectedCategory === sub.id || 
+                  selectedCategory?.toLowerCase() === sub.name.toLowerCase() ||
+                  (currentCategoryObj && String(currentCategoryObj.id) === String(sub.id));
+
+                return (
+                  <button 
+                    key={sub.id} 
+                    onClick={() => handleCategoryClick(sub.slug || sub.id)}
+                    className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                      isSubActive 
+                        ? 'bg-primary-blue text-white shadow-lg shadow-primary-blue/25 scale-[1.02]' 
+                        : 'bg-light-gray/80 text-dark-gray hover:bg-white hover:text-primary-blue border border-transparent hover:border-primary-blue/30'
+                    }`}
+                  >
+                    <span>{sub.name}</span>
+                    {sub.productCount > 0 && (
+                      <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                        isSubActive ? 'bg-white/20 text-white' : 'bg-white text-medium-gray shadow-sm'
+                      }`}>
+                        {sub.productCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </>
+          ) : (
+            // When no root category is active (e.g. global search)
+            <>
+              <button 
+                onClick={() => handleCategoryClick(null)}
+                className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 shrink-0 ${
+                  !selectedCategory 
+                    ? 'bg-primary-blue text-white shadow-lg shadow-primary-blue/25 scale-[1.02]' 
+                    : 'bg-light-gray/80 text-dark-gray hover:bg-white hover:text-primary-blue border border-transparent hover:border-primary-blue/30'
+                }`}
+              >
+                {language === 'fr' ? 'Tous les produits' : 'All Products'}
+              </button>
+              {categories.filter(c => !c.parentId).map((cat) => {
+                const isCatActive = selectedCategory === cat.slug || selectedCategory === cat.id;
+                return (
+                  <button 
+                    key={cat.id} 
+                    onClick={() => handleCategoryClick(cat.slug || cat.id)}
+                    className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                      isCatActive 
+                        ? 'bg-primary-blue text-white shadow-lg shadow-primary-blue/25 scale-[1.02]' 
+                        : 'bg-light-gray/80 text-dark-gray hover:bg-white hover:text-primary-blue border border-transparent hover:border-primary-blue/30'
+                    }`}
+                  >
+                    <span>{cat.name}</span>
+                    {cat.productCount > 0 && (
+                      <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                        isCatActive ? 'bg-white/20 text-white' : 'bg-white text-medium-gray shadow-sm'
+                      }`}>
+                        {cat.productCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       </div>
 
@@ -306,8 +431,7 @@ export const CataloguePage = () => {
                   setPriceRange([0, 1500000]);
                   setSelectedBrands([]);
                   setSearchQuery('');
-                  setActiveTab(language === 'fr' ? 'Tous' : 'All');
-                  setSelectedCategory(null);
+                  handleCategoryClick(null);
                 }}
                 className="text-xs text-red-500 font-bold hover:underline"
               >
@@ -477,17 +601,16 @@ export const CataloguePage = () => {
                 <div className="col-span-full py-20 text-center">
                    <p className="text-lg text-medium-gray">{t.noMatch}</p>
                    <button 
-                     onClick={() => {
-                        setSelectedBrands([]);
-                        setPriceRange([0, 1500000]);
-                        setSearchQuery('');
-                        setActiveTab(language === 'fr' ? 'Tous' : 'All');
-                        setSelectedCategory(null);
-                     }} 
-                     className="mt-4 text-primary-blue font-bold hover:underline"
-                   >
-                     {t.resetFilters}
-                   </button>
+                      onClick={() => {
+                         setSelectedBrands([]);
+                         setPriceRange([0, 1500000]);
+                         setSearchQuery('');
+                         handleCategoryClick(null);
+                      }} 
+                      className="mt-4 text-primary-blue font-bold hover:underline"
+                    >
+                      {t.resetFilters}
+                    </button>
                 </div>
               )}
             </div>

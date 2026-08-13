@@ -30,10 +30,11 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActive
 }) => {
   const { adminLogout, adminUser, reviews } = useAppContext();
   const [ordersBadge, setOrdersBadge] = React.useState<number>(0);
+  const isSuperAdmin = adminUser?.role === 'ROLE_SUPER_ADMIN' || adminUser?.isSuperAdmin;
 
   // Charger le compteur de commandes en attente d'action
   React.useEffect(() => {
-    if (!adminUser) return;
+    if (!adminUser || !isSuperAdmin) return;
     let active = true;
 
     const loadOrderStats = async () => {
@@ -67,35 +68,43 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActive
       active = false;
       clearInterval(interval);
     };
-  }, [adminUser]);
+  }, [adminUser, isSuperAdmin]);
 
   // Avis en attente (pending)
   const pendingReviewsCount = reviews.length > 0
     ? reviews.filter(r => r.status === 'pending').length
     : 2; // Valeur simulée par défaut s'il n'y a pas d'avis réels chargés
 
-  const menuItems = [
-    { section: 'GENERAL', items: [
-      { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard },
-    ]},
-    { section: 'CATALOGUE', items: [
-      { id: 'products', label: 'Produits', icon: Package },
-      { id: 'categories', label: 'Catégories', icon: Menu },
-      { id: 'stocks', label: 'Stocks', icon: Package },
-    ]},
-    { section: 'VENTES', items: [
-      { id: 'orders', label: 'Commandes', icon: ShoppingCart, badge: ordersBadge > 0 ? ordersBadge : undefined },
-      { id: 'clients', label: 'Clients', icon: Users },
-      { id: 'promotions', label: 'Promotions', icon: Ticket },
-    ]},
-    { section: 'CONTENU', items: [
-      { id: 'reviews', label: 'Avis Clients', icon: Star, badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined },
-      { id: 'content', label: 'Gestion Site', icon: Monitor },
-    ]},
-    { section: 'SYSTEME', items: [
-      { id: 'settings', label: 'Paramètres', icon: Settings },
-    ]}
-  ];
+  const menuItems = isSuperAdmin
+    ? [
+        { section: 'GENERAL', items: [
+          { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard },
+        ]},
+        { section: 'CATALOGUE', items: [
+          { id: 'products', label: 'Produits', icon: Package },
+          { id: 'categories', label: 'Catégories', icon: Menu },
+          { id: 'stocks', label: 'Stocks', icon: Package },
+        ]},
+        { section: 'VENTES', items: [
+          { id: 'orders', label: 'Commandes', icon: ShoppingCart, badge: ordersBadge > 0 ? ordersBadge : undefined },
+          { id: 'clients', label: 'Clients', icon: Users },
+          { id: 'promotions', label: 'Promotions', icon: Ticket },
+        ]},
+        { section: 'CONTENU', items: [
+          { id: 'reviews', label: 'Avis Clients', icon: Star, badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined },
+          { id: 'content', label: 'Gestion Site', icon: Monitor },
+        ]},
+        { section: 'SYSTEME', items: [
+          { id: 'team', label: 'Gestion Équipe', icon: Users },
+          { id: 'settings', label: 'Paramètres', icon: Settings },
+        ]}
+      ]
+    : [
+        { section: 'CATALOGUE', items: [
+          { id: 'products', label: 'Produits', icon: Package },
+          { id: 'categories', label: 'Catégories', icon: Menu },
+        ]}
+      ];
 
   return (
     <div className={`fixed left-0 top-0 bottom-0 bg-[#0F172A] text-white transition-all duration-300 z-[100] flex flex-col 
@@ -169,7 +178,9 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActive
         {!isCollapsed && (
           <div className="flex-1 min-w-0 overflow-hidden">
             <p className="text-sm font-bold truncate">{adminUser?.name || 'Admin'}</p>
-            <p className="text-[10px] text-white/50 uppercase font-black">{adminUser?.role === 'super_admin' ? 'Super Admin' : 'Gestionnaire'}</p>
+            <p className="text-[10px] text-white/50 uppercase font-black">
+              {isSuperAdmin ? 'Super Admin' : 'Gestionnaire'}
+            </p>
           </div>
         )}
         <button 

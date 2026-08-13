@@ -131,6 +131,12 @@ api.interceptors.response.use(
 
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
+    // Intercepter les accès refusés (403 Forbidden) sur les routes d'admin
+    if (error.response?.status === 403 && originalRequest.url?.includes('/api/admin')) {
+      window.location.hash = 'admin/forbidden';
+      return Promise.reject(error);
+    }
+
     // Ignore les erreurs non-401 ou les routes de login/refresh (évite boucle infinie)
     const isAuthRoute =
       originalRequest.url?.includes('/auth/login') ||

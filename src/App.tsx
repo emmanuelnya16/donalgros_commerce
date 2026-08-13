@@ -343,7 +343,7 @@ function AppContent() {
       <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
         {/* Floating WhatsApp Button */}
         <motion.a
-          href="https://wa.me/237696001685?text=Bonjour,%20j'aimerais%20avoir%20des%20informations%20sur%20les%20produits%20de%20Donald%20Gros."
+          href="https://wa.me/237682218536?text=Bonjour,%20j'aimerais%20avoir%20des%20informations%20sur%20les%20produits%20de%20Donald%20Gros."
           target="_blank"
           rel="noopener noreferrer"
           initial={{ opacity: 0, scale: 0.5 }}

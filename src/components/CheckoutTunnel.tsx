@@ -843,7 +843,7 @@ export const CheckoutTunnel = () => {
                 <div className="space-y-4">
                   {/* Bouton WhatsApp de validation de commande */}
                   <a
-                    href={`https://wa.me/237696001685?text=Bonjour,%20je%20viens%20de%20passer%20la%20commande%20n%C2%B0%20${createdOrder ? createdOrder.orderNumber : ''}`}
+                    href={`https://wa.me/237682218536?text=Bonjour,%20je%20viens%20de%20passer%20la%20commande%20n%C2%B0%20${createdOrder ? createdOrder.orderNumber : ''}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full h-16 bg-[#25D366] text-white rounded-2xl font-display font-black text-sm uppercase tracking-widest shadow-xl shadow-green-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"

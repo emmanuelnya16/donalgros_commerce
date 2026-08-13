@@ -89,4 +89,53 @@ export const getAdminMe = async (): Promise<AuthAdmin | null> => {
   }
 };
 
+// ─── Nouvelles fonctionnalités d'administration (Création & Activation) ───────
+
+export interface CreateAdminPayload {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: 'ROLE_SUPER_ADMIN' | 'ROLE_MANAGER';
+}
+
+export interface CreatedAdminData {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: 'ROLE_SUPER_ADMIN' | 'ROLE_MANAGER';
+  isActive: boolean;
+  activationToken?: string;
+  mailSent: boolean;
+}
+
+export interface ActivateAdminPayload {
+  token: string;
+  password: string;
+}
+
+/**
+  * Créer un administrateur — POST /api/admin/users
+  * Nécessite le rôle ROLE_SUPER_ADMIN
+  */
+export const createAdmin = async (payload: CreateAdminPayload): Promise<CreatedAdminData> => {
+  const { data } = await api.post<SymfonyResponse<CreatedAdminData>>(
+    '/api/admin/users',
+    payload
+  );
+  return data.data;
+};
+
+/**
+  * Activer un compte administrateur — POST /api/admin/auth/activate
+  * Public, pas de token requis
+  */
+export const activateAdmin = async (payload: ActivateAdminPayload): Promise<void> => {
+  await api.post<SymfonyResponse<null>>(
+    '/api/admin/auth/activate',
+    payload
+  );
+};
+
 export { extractErrorMessage };
+

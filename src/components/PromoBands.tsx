@@ -11,7 +11,7 @@ export const TopBar = () => {
       <div className="max-w-[1600px] mx-auto px-4 md:px-8 h-full flex items-center justify-between text-[13px] font-sans">
         <div className="flex items-center gap-6">
           <span>🕒 {language === 'fr' ? 'Livraison: Lun - Sam 8h - 20h' : 'Delivery: Mon - Sat 8am - 8pm'}</span>
-          <span className="hidden sm:inline">📞 +237 6XX XXX XXX</span>
+          <span className="hidden sm:inline">📞 <a href="tel:+237682218536" className="hover:text-primary-green transition-colors font-bold">+237 682 218 536</a></span>
         </div>
         <div className="flex items-center gap-4">
           <select 

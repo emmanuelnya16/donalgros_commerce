@@ -159,14 +159,27 @@ export const HeroBanner = () => {
 };
 
 export const CategoryGrid = () => {
-  const { language } = useAppContext();
+  const { language, categories } = useAppContext();
 
-  const CATEGORIES = [
-    { id: 'homme', name: language === 'fr' ? 'HOMME' : 'MEN', count: 124, image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSCer20admfWblBk9dCsSSprT448KeqZkXpoA&s' },
-    { id: 'femme', name: language === 'fr' ? 'FEMME' : 'WOMEN', count: 218, image: 'https://image.made-in-china.com/202f0j00kYvCAeQWEEbF/Summer-Black-New-Dress-Women-Fashion-Sexy-Evening-Dress.webp' },
-    { id: 'chaussures', name: language === 'fr' ? 'CHAUSSURES' : 'SHOES', count: 86, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=600&auto=format&fit=crop' },
-    { id: 'electromenager', name: language === 'fr' ? 'ELECTROMÉNAGER' : 'APPLIANCES', count: 42, image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=600&auto=format&fit=crop' }
-  ];
+  // Root categories from AppContext or fallback
+  const displayCategories = React.useMemo(() => {
+    const rootCats = categories.filter(c => !c.parentId);
+    if (rootCats.length > 0) {
+      return rootCats.map(c => ({
+        id: c.slug || c.id,
+        slug: c.slug || c.id,
+        name: c.name.toUpperCase(),
+        count: c.productCount || 0,
+        image: c.image || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=600&auto=format&fit=crop'
+      }));
+    }
+    return [
+      { id: 'homme', slug: 'homme', name: language === 'fr' ? 'HOMME' : 'MEN', count: 124, image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSCer20admfWblBk9dCsSSprT448KeqZkXpoA&s' },
+      { id: 'femme', slug: 'femme', name: language === 'fr' ? 'FEMME' : 'WOMEN', count: 218, image: 'https://image.made-in-china.com/202f0j00kYvCAeQWEEbF/Summer-Black-New-Dress-Women-Fashion-Sexy-Evening-Dress.webp' },
+      { id: 'chaussures', slug: 'chaussures', name: language === 'fr' ? 'CHAUSSURES' : 'SHOES', count: 86, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=600&auto=format&fit=crop' },
+      { id: 'electromenager', slug: 'electromenager', name: language === 'fr' ? 'ELECTROMÉNAGER' : 'APPLIANCES', count: 42, image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=600&auto=format&fit=crop' }
+    ];
+  }, [categories, language]);
 
   return (
     <section className="max-w-[1600px] mx-auto px-4 md:px-8 py-6 md:py-8">
@@ -180,7 +193,7 @@ export const CategoryGrid = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {CATEGORIES.map((cat) => (
+        {displayCategories.map((cat) => (
           <CategoryCard key={cat.id} {...cat} />
         ))}
       </div>
@@ -188,10 +201,16 @@ export const CategoryGrid = () => {
   );
 };
 
-const CategoryCard = ({ name, image }: any) => {
+const CategoryCard = ({ id, slug, name, image, count }: any) => {
+  const { language } = useAppContext();
+  const targetSlug = slug || id;
+
   return (
     <div 
-      className="group relative overflow-hidden rounded-xl bg-light-gray h-28 md:h-36"
+      onClick={() => {
+        window.location.hash = `catalogue?category=${encodeURIComponent(targetSlug)}`;
+      }}
+      className="group relative overflow-hidden rounded-xl bg-light-gray h-28 md:h-36 cursor-pointer transform hover:-translate-y-1 transition-all duration-300 shadow-sm hover:shadow-xl"
     >
       <img
         src={image}
@@ -199,11 +218,16 @@ const CategoryCard = ({ name, image }: any) => {
         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
       />
       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors duration-300" />
-      <div className="absolute inset-0 flex items-center justify-center p-3 text-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center">
         <h3 className="text-base md:text-lg font-display font-black text-white uppercase tracking-wider drop-shadow-md">
           {name}
         </h3>
+        {count !== undefined && count > 0 && (
+          <span className="text-white/80 text-[11px] font-medium mt-1">
+            {count} {language === 'fr' ? 'articles' : 'items'}
+          </span>
+        )}
       </div>
     </div>
   );
-}
+};

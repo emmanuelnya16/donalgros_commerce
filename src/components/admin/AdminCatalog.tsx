@@ -641,14 +641,14 @@ export const AdminCatalog = () => {
       {/* --- FORM MODAL --- */}
       <AnimatePresence>
         {isFormOpen && (
-          <div className="fixed inset-0 bg-[#0F172A]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-[#0F172A]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl w-full max-w-[850px] max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+              className="bg-white rounded-2xl w-full max-w-[850px] h-[95vh] max-h-[95vh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
             >
-              <div className="p-6 border-b border-light-gray flex items-center justify-between bg-primary-blue/5">
+              <div className="p-4 sm:p-6 border-b border-light-gray flex items-center justify-between bg-primary-blue/5">
                 <div>
                    <h2 className="font-display font-black text-xl text-dark-gray">{editingProduct ? 'Modifier le produit' : 'Nouveau Produit'}</h2>
                    <p className="text-xs text-medium-gray font-medium">Gérez les fiches techniques, tarifs, variantes et médias</p>
@@ -659,33 +659,31 @@ export const AdminCatalog = () => {
               </div>
 
               {/* Tabs selector */}
-              <div className="flex bg-[#F8FAFC] border-b border-light-gray px-6">
+              <div className="flex overflow-x-auto no-scrollbar whitespace-nowrap bg-[#F8FAFC] border-b border-light-gray px-2 sm:px-6 justify-between sm:justify-start">
                 <button 
                   onClick={() => setActiveFormTab('general')}
-                  className={`h-12 px-6 font-bold text-xs uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${activeFormTab === 'general' ? 'border-primary-blue text-primary-blue' : 'border-transparent text-medium-gray'}`}
+                  className={`h-12 px-3 sm:px-6 font-bold text-[10px] sm:text-xs uppercase tracking-wider border-b-2 transition-all flex items-center gap-1 sm:gap-2 shrink-0 ${activeFormTab === 'general' ? 'border-primary-blue text-primary-blue' : 'border-transparent text-medium-gray'}`}
                 >
                   <Tag className="w-4 h-4" />
-                  Général et prix
+                  Général<span className="hidden sm:inline"> et prix</span>
                 </button>
                 <button 
                   onClick={() => setActiveFormTab('variants')}
-                  className={`h-12 px-6 font-bold text-xs uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${activeFormTab === 'variants' ? 'border-primary-blue text-primary-blue' : 'border-transparent text-medium-gray'}`}
+                  className={`h-12 px-3 sm:px-6 font-bold text-[10px] sm:text-xs uppercase tracking-wider border-b-2 transition-all flex items-center gap-1 sm:gap-2 shrink-0 ${activeFormTab === 'variants' ? 'border-primary-blue text-primary-blue' : 'border-transparent text-medium-gray'}`}
                 >
                   <Layers className="w-4 h-4" />
                   Variantes ({variantsList.length})
                 </button>
                 <button 
-                  disabled={!editingProduct}
                   onClick={() => setActiveFormTab('images')}
-                  className={`h-12 px-6 font-bold text-xs uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 disabled:opacity-50 ${activeFormTab === 'images' ? 'border-primary-blue text-primary-blue' : 'border-transparent text-medium-gray'}`}
-                  title={!editingProduct ? "Créez le produit d'abord pour activer les photos" : ""}
+                  className={`h-12 px-3 sm:px-6 font-bold text-[10px] sm:text-xs uppercase tracking-wider border-b-2 transition-all flex items-center gap-1 sm:gap-2 shrink-0 ${activeFormTab === 'images' ? 'border-primary-blue text-primary-blue' : 'border-transparent text-medium-gray'}`}
                 >
                   <ImageIcon className="w-4 h-4" />
                   Photos ({imagesList.length})
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 space-y-6 no-scrollbar bg-[#F8FAFC]">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-6 no-scrollbar bg-[#F8FAFC]">
                 {formError && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-600">
                     {formError}
@@ -694,8 +692,8 @@ export const AdminCatalog = () => {
 
                 {/* Tab General */}
                 {activeFormTab === 'general' && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4 sm:space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       <div className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-medium-gray ml-1">Nom du produit *</label>
@@ -767,7 +765,7 @@ export const AdminCatalog = () => {
                       </div>
 
                       <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-medium-gray ml-1">Prix de base (FCFA) *</label>
                             <input 
@@ -795,7 +793,7 @@ export const AdminCatalog = () => {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-medium-gray ml-1">Début Promo</label>
                             <input 
@@ -817,7 +815,7 @@ export const AdminCatalog = () => {
                           </div>
                         </div>
 
-                        <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50 space-y-3">
+                        <div className="p-3 sm:p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50 space-y-3">
                           <span className="text-[10px] font-black uppercase text-primary-blue tracking-wider">SEO et Référencement</span>
                           <div className="space-y-1.5">
                             <input 
@@ -869,14 +867,14 @@ export const AdminCatalog = () => {
 
                 {/* Tab Variants */}
                 {activeFormTab === 'variants' && (
-                  <div className="space-y-6">
+                  <div className="space-y-4 sm:space-y-6">
                     {/* Add Variant Form */}
-                    <div className="bg-white p-6 rounded-2xl border border-light-gray shadow-sm space-y-4">
+                    <div className="bg-white p-4 sm:p-6 rounded-2xl border border-light-gray shadow-sm space-y-4">
                       <h4 className="text-xs font-black text-dark-gray uppercase tracking-wider flex items-center gap-2">
                         <Plus className="w-4 h-4 text-primary-blue" />
                         Ajouter une variante
                       </h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 items-end">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4 items-end">
                         <div className="space-y-1.5 col-span-1">
                           <label className="text-[9px] font-black uppercase text-medium-gray">Taille</label>
                           <input type="text" value={newVarSize} onChange={(e) => setNewVarSize(e.target.value)} placeholder="Ex: M, XL, 42" className="w-full h-10 px-3 bg-light-gray/30 border border-light-gray rounded-xl text-xs font-bold outline-none" />
@@ -914,31 +912,31 @@ export const AdminCatalog = () => {
                     </div>
 
                     {/* Variants list table */}
-                    <div className="bg-white rounded-2xl border border-light-gray overflow-hidden">
-                      <table className="w-full text-left">
+                    <div className="bg-white rounded-2xl border border-light-gray overflow-x-auto">
+                      <table className="w-full text-left min-w-[600px] sm:min-w-0">
                         <thead className="bg-[#F8FAFC] text-[9px] font-black text-medium-gray uppercase tracking-widest border-b border-light-gray">
                           <tr>
-                            <th className="px-6 py-3">Taille</th>
-                            <th className="px-6 py-3">Couleur</th>
-                            <th className="px-6 py-3">Code Hex</th>
-                            <th className="px-6 py-3">Stock</th>
-                            <th className="px-6 py-3">Prix Supp.</th>
-                            <th className="px-6 py-3 text-right">Actions</th>
+                            <th className="px-3 sm:px-6 py-3">Taille</th>
+                            <th className="px-3 sm:px-6 py-3">Couleur</th>
+                            <th className="px-3 sm:px-6 py-3">Code Hex</th>
+                            <th className="px-3 sm:px-6 py-3">Stock</th>
+                            <th className="px-3 sm:px-6 py-3">Prix Supp.</th>
+                            <th className="px-3 sm:px-6 py-3 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-light-gray text-xs">
                           {variantsList.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-6 py-8 text-center text-medium-gray italic font-medium">
+                              <td colSpan={6} className="px-3 sm:px-6 py-8 text-center text-medium-gray italic font-medium">
                                 Aucune variante définie pour ce produit.
                               </td>
                             </tr>
                           ) : (
                             variantsList.map((v, idx) => (
                               <tr key={idx} className="hover:bg-slate-50">
-                                <td className="px-6 py-3 font-bold text-dark-gray">{v.size || '-'}</td>
-                                <td className="px-6 py-3 font-bold text-dark-gray">{v.color || '-'}</td>
-                                <td className="px-6 py-3 font-mono">
+                                <td className="px-3 sm:px-6 py-3 font-bold text-dark-gray">{v.size || '-'}</td>
+                                <td className="px-3 sm:px-6 py-3 font-bold text-dark-gray">{v.color || '-'}</td>
+                                <td className="px-3 sm:px-6 py-3 font-mono">
                                   {v.colorHex ? (
                                     <span className="flex items-center gap-1.5">
                                       <span className="w-4 h-4 rounded-full border border-light-gray shrink-0" style={{ backgroundColor: v.colorHex }} />
@@ -946,9 +944,9 @@ export const AdminCatalog = () => {
                                     </span>
                                   ) : '-'}
                                 </td>
-                                <td className="px-6 py-3 font-black text-dark-gray">{v.stock}</td>
-                                <td className="px-6 py-3 font-black text-primary-blue">+{v.extraPrice} F</td>
-                                <td className="px-6 py-3 text-right">
+                                <td className="px-3 sm:px-6 py-3 font-black text-dark-gray">{v.stock}</td>
+                                <td className="px-3 sm:px-6 py-3 font-black text-primary-blue">+{v.extraPrice} F</td>
+                                <td className="px-3 sm:px-6 py-3 text-right">
                                   <button 
                                     type="button" 
                                     onClick={() => removeVariantFromState(idx)}
@@ -967,143 +965,158 @@ export const AdminCatalog = () => {
                 )}
 
                 {/* Tab Images */}
-                {activeFormTab === 'images' && editingProduct && (
-                  <div className="space-y-6">
-                    {/* Upload Box */}
-                    <div className="bg-white p-6 rounded-2xl border border-light-gray shadow-sm space-y-4">
-                      <h4 className="text-xs font-black text-dark-gray uppercase tracking-wider">
-                        Sélectionner des images de produit
-                      </h4>
-                      <div className="flex flex-col gap-4">
-                        <div className="flex items-center gap-4">
-                          <label className="h-12 px-6 bg-primary-blue text-white rounded-xl font-display font-black text-xs uppercase tracking-widest hover:brightness-110 cursor-pointer flex items-center justify-center gap-2">
-                            <Plus className="w-4 h-4" />
-                            Ajouter des fichiers
-                            <input 
-                              type="file" 
-                              multiple 
-                              accept="image/*" 
-                              onChange={handleSelectFiles} 
-                              className="hidden" 
-                            />
-                          </label>
-                          {uploadingImage && (
-                            <span className="text-xs text-medium-gray font-bold animate-pulse">Téléversement en cours...</span>
+                {activeFormTab === 'images' && (
+                  !editingProduct ? (
+                    <div className="bg-white p-8 rounded-2xl border border-light-gray shadow-sm flex flex-col items-center justify-center text-center space-y-4 my-2">
+                      <div className="w-16 h-16 bg-primary-blue/5 rounded-full flex items-center justify-center text-primary-blue">
+                        <ImageIcon className="w-8 h-8" />
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-display font-black text-base text-dark-gray">Photos indisponibles</h4>
+                        <p className="text-sm text-medium-gray max-w-xs mx-auto">
+                          Veuillez enregistrer ou publier ce produit d'abord pour pouvoir lui associer des photos.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 sm:space-y-6">
+                      {/* Upload Box */}
+                      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-light-gray shadow-sm space-y-4">
+                        <h4 className="text-xs font-black text-dark-gray uppercase tracking-wider">
+                          Sélectionner des images de produit
+                        </h4>
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-center gap-4">
+                            <label className="h-12 px-6 bg-primary-blue text-white rounded-xl font-display font-black text-xs uppercase tracking-widest hover:brightness-110 cursor-pointer flex items-center justify-center gap-2">
+                              <Plus className="w-4 h-4" />
+                              Ajouter des fichiers
+                              <input 
+                                type="file" 
+                                multiple 
+                                accept="image/*" 
+                                onChange={handleSelectFiles} 
+                                className="hidden" 
+                              />
+                            </label>
+                            {uploadingImage && (
+                              <span className="text-xs text-medium-gray font-bold animate-pulse">Téléversement en cours...</span>
+                            )}
+                          </div>
+
+                          {/* Queue of pending uploads */}
+                          {pendingUploads.length > 0 && (
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-light-gray/50 space-y-4">
+                              <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between border-b border-light-gray pb-2">
+                                <span className="text-[10px] font-black text-dark-gray uppercase tracking-widest">Images à téléverser ({pendingUploads.length})</span>
+                                <button 
+                                  type="button" 
+                                  onClick={handleUploadAllImages}
+                                  disabled={uploadingImage}
+                                  className="w-full sm:w-auto px-4 py-2 bg-primary-green text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:brightness-110 active:scale-95 transition-all shadow shadow-primary-green/20 text-center"
+                                >
+                                  {uploadingImage ? 'Téléversement...' : 'Lancer le téléversement'}
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                {pendingUploads.map((item, idx) => (
+                                  <div key={idx} className="flex gap-4 p-3 bg-white border border-light-gray rounded-xl items-center relative group">
+                                    <img src={item.previewUrl} className="w-16 h-16 object-cover rounded-lg border border-light-gray" alt="" />
+                                    <div className="flex-1 space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <input 
+                                          type="checkbox" 
+                                          id={`main-pending-${idx}`}
+                                          checked={item.isMain}
+                                          onChange={(e) => handleUpdatePending(idx, { isMain: e.target.checked })}
+                                          className="rounded text-primary-blue focus:ring-primary-blue w-4 h-4" 
+                                        />
+                                        <label htmlFor={`main-pending-${idx}`} className="text-[10px] font-bold text-dark-gray cursor-pointer">Image principale</label>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <label className="text-[8px] font-black uppercase text-medium-gray block">Couleur associée (Optionnel)</label>
+                                        <input 
+                                          type="text" 
+                                          value={item.color} 
+                                          onChange={(e) => handleUpdatePending(idx, { color: e.target.value })}
+                                          placeholder="Ex: Rouge, Blanc"
+                                          className="w-full h-7 px-2 border border-light-gray rounded bg-light-gray/30 text-xs font-bold"
+                                        />
+                                      </div>
+                                    </div>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleRemovePending(idx)}
+                                      className="p-1 text-red-500 hover:bg-red-50 rounded self-start absolute top-2 right-2"
+                                    >
+                                      <Plus className="w-4 h-4 rotate-45" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
+                      </div>
 
-                        {/* Queue of pending uploads */}
-                        {pendingUploads.length > 0 && (
-                          <div className="p-4 bg-slate-50 rounded-2xl border border-light-gray/50 space-y-4">
-                            <div className="flex items-center justify-between border-b border-light-gray pb-2">
-                              <span className="text-[10px] font-black text-dark-gray uppercase tracking-widest">Images à téléverser ({pendingUploads.length})</span>
-                              <button 
-                                type="button" 
-                                onClick={handleUploadAllImages}
-                                disabled={uploadingImage}
-                                className="px-4 py-2 bg-primary-green text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:brightness-110 active:scale-95 transition-all shadow shadow-primary-green/20"
-                              >
-                                {uploadingImage ? 'Téléversement...' : 'Lancer le téléversement'}
-                              </button>
+                      {/* Existing Images list */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-black text-medium-gray uppercase tracking-widest block ml-1">Images existantes (Glisser-déposer pour réordonner)</span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                          {imagesList.length === 0 ? (
+                            <div className="col-span-full py-12 text-center text-medium-gray italic font-medium bg-white rounded-2xl border border-dashed border-light-gray">
+                              Aucune image disponible. Ajoutez la première photo !
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {pendingUploads.map((item, idx) => (
-                                <div key={idx} className="flex gap-4 p-3 bg-white border border-light-gray rounded-xl items-center relative group">
-                                  <img src={item.previewUrl} className="w-16 h-16 object-cover rounded-lg border border-light-gray" alt="" />
-                                  <div className="flex-1 space-y-2">
-                                    <div className="flex items-center gap-2">
-                                      <input 
-                                        type="checkbox" 
-                                        id={`main-pending-${idx}`}
-                                        checked={item.isMain}
-                                        onChange={(e) => handleUpdatePending(idx, { isMain: e.target.checked })}
-                                        className="rounded text-primary-blue focus:ring-primary-blue w-4 h-4" 
-                                      />
-                                      <label htmlFor={`main-pending-${idx}`} className="text-[10px] font-bold text-dark-gray cursor-pointer">Image principale</label>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <label className="text-[8px] font-black uppercase text-medium-gray block">Couleur associée (Optionnel)</label>
-                                      <input 
-                                        type="text" 
-                                        value={item.color} 
-                                        onChange={(e) => handleUpdatePending(idx, { color: e.target.value })}
-                                        placeholder="Ex: Rouge, Blanc"
-                                        className="w-full h-7 px-2 border border-light-gray rounded bg-light-gray/30 text-xs font-bold"
-                                      />
-                                    </div>
-                                  </div>
+                          ) : (
+                            imagesList.map((img, idx) => (
+                              <div 
+                                key={img.id} 
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, idx)}
+                                onDragOver={(e) => handleDragOver(e, idx)}
+                                onDrop={(e) => handleDrop(e, idx)}
+                                className="bg-white rounded-2xl border border-light-gray overflow-hidden shadow-sm relative group cursor-grab active:cursor-grabbing transition-all hover:border-primary-blue hover:shadow-md"
+                              >
+                                <div className="aspect-square relative bg-slate-100">
+                                  <img src={img.url} className="w-full h-full object-cover select-none pointer-events-none" alt="" />
+                                  {img.isMain && (
+                                    <span className="absolute top-2 left-2 bg-yellow-400 text-dark-gray text-[9px] font-black px-2 py-0.5 rounded shadow">
+                                      PRINCIPALE
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="p-2 sm:p-3 flex items-center justify-between border-t border-light-gray bg-white gap-1">
                                   <button 
                                     type="button" 
-                                    onClick={() => handleRemovePending(idx)}
-                                    className="p-1 text-red-500 hover:bg-red-50 rounded self-start absolute top-2 right-2"
+                                    disabled={img.isMain}
+                                    onClick={() => handleSetMainImage(img.id)}
+                                    className="text-[9px] sm:text-[10px] font-black text-primary-blue hover:underline disabled:opacity-30 truncate"
+                                    title="Définir principale"
                                   >
-                                    <Plus className="w-4 h-4 rotate-45" />
+                                    Définir principale
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => handleDeleteImage(img.id)}
+                                    className="p-1 text-red-500 hover:bg-red-50 rounded shrink-0"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
-
-                    {/* Existing Images list */}
-                    <div className="space-y-2">
-                      <span className="text-[10px] font-black text-medium-gray uppercase tracking-widest block ml-1">Images existantes (Glisser-déposer pour réordonner)</span>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {imagesList.length === 0 ? (
-                          <div className="col-span-full py-12 text-center text-medium-gray italic font-medium bg-white rounded-2xl border border-dashed border-light-gray">
-                            Aucune image disponible. Ajoutez la première photo !
-                          </div>
-                        ) : (
-                          imagesList.map((img, idx) => (
-                            <div 
-                              key={img.id} 
-                              draggable
-                              onDragStart={(e) => handleDragStart(e, idx)}
-                              onDragOver={(e) => handleDragOver(e, idx)}
-                              onDrop={(e) => handleDrop(e, idx)}
-                              className="bg-white rounded-2xl border border-light-gray overflow-hidden shadow-sm relative group cursor-grab active:cursor-grabbing transition-all hover:border-primary-blue hover:shadow-md"
-                            >
-                              <div className="aspect-square relative bg-slate-100">
-                                <img src={img.url} className="w-full h-full object-cover select-none pointer-events-none" alt="" />
-                                {img.isMain && (
-                                  <span className="absolute top-2 left-2 bg-yellow-400 text-dark-gray text-[9px] font-black px-2 py-0.5 rounded shadow">
-                                    PRINCIPALE
-                                  </span>
-                                )}
-                              </div>
-                              <div className="p-3 flex items-center justify-between border-t border-light-gray bg-white">
-                                <button 
-                                  type="button" 
-                                  disabled={img.isMain}
-                                  onClick={() => handleSetMainImage(img.id)}
-                                  className="text-[10px] font-black text-primary-blue hover:underline disabled:opacity-30"
-                                >
-                                  Définir principale
-                                </button>
-                                <button 
-                                  type="button" 
-                                  onClick={() => handleDeleteImage(img.id)}
-                                  className="p-1 text-red-500 hover:bg-red-50 rounded"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  )
                 )}
               </div>
 
-              <div className="p-6 bg-white border-t border-light-gray flex items-center justify-end gap-3 shadow-lg">
+              <div className="p-4 sm:p-6 bg-white border-t border-light-gray flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 shadow-lg">
                 <button 
                   type="button" 
                   onClick={() => setIsFormOpen(false)} 
-                  className="h-11 px-6 rounded-xl font-bold text-sm text-medium-gray hover:bg-light-gray transition-all"
+                  className="h-11 px-6 rounded-xl font-bold text-sm text-medium-gray hover:bg-light-gray transition-all text-center"
                 >
                   Annuler
                 </button>
@@ -1111,10 +1124,15 @@ export const AdminCatalog = () => {
                   type="button" 
                   disabled={submitting}
                   onClick={handleFormSubmit}
-                  className="h-11 px-8 bg-primary-blue text-white rounded-xl font-display font-black text-sm uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary-blue/20 flex items-center gap-2"
+                  className="h-11 px-6 sm:px-8 bg-primary-blue text-white rounded-xl font-display font-black text-xs sm:text-sm uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary-blue/20 flex items-center justify-center gap-2"
                 >
                   <Save className="w-4 h-4" />
-                  {submitting ? 'Enregistrement...' : editingProduct ? 'Enregistrer les modifications' : 'Publier le produit'}
+                  {submitting ? 'Enregistrement...' : (
+                    <>
+                      {editingProduct ? 'Enregistrer' : 'Publier'}
+                      <span className="hidden sm:inline"> {editingProduct ? 'les modifications' : 'le produit'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>

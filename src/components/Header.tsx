@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Heart, User, ShoppingCart, Menu, X, ChevronRight, LogOut, Package, MapPin, Calculator, Trash2 } from 'lucide-react';
+import { Search, Heart, User, ShoppingCart, Menu, X, ChevronRight, LogOut, Package, MapPin, Calculator, Trash2, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppContext } from '../context/AppContext';
 
@@ -32,6 +32,30 @@ export const Header = () => {
 
   return (
     <>
+      {/* Top Contact Bar */}
+      <div className={`w-full bg-primary-blue text-white text-xs transition-all duration-300 ${isScrolled ? 'hidden' : 'block'}`}>
+        <div className="max-w-[1600px] mx-auto px-4 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 py-1.5">
+          {/* Adresse */}
+          <div className="flex items-center gap-1.5 text-white/80 hidden md:flex">
+            <MapPin className="w-3.5 h-3.5 text-primary-green shrink-0" />
+            <span>Quartier Mokolo, face au commissariat, bloc administratif du marché de Mokolo, Yaoundé</span>
+          </div>
+          {/* Horaires */}
+          <div className="flex items-center gap-1.5 text-white/90 font-medium whitespace-nowrap">
+            <span>🕒</span>
+            <span>Livraison : Lun – Sam &nbsp;8h – 20h</span>
+          </div>
+          {/* Téléphone */}
+          <a
+            href="tel:+237682218536"
+            className="flex items-center gap-1.5 font-bold text-white hover:text-primary-green transition-colors whitespace-nowrap"
+          >
+            <Phone className="w-3.5 h-3.5" />
+            +237 682 218 536
+          </a>
+        </div>
+      </div>
+
       <header className={`w-full z-50 transition-all duration-300 ${isScrolled ? 'sticky top-0 bg-white shadow-md py-3' : 'bg-white py-4 md:py-6 border-b border-light-gray'}`}>
       <div className="max-w-[1600px] mx-auto px-4 md:px-8 flex items-center justify-between gap-4">
           {/* Logo */}

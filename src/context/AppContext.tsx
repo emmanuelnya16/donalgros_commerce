@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AuthUser, userLogin, userRegister, userLogout, getMe, LoginPayload, RegisterPayload } from '../services/authService';
-import { AuthAdmin, adminLogin as apiAdminLogin, adminLogout as apiAdminLogout, AdminLoginPayload, getAdminMe } from '../services/adminAuthService';
+import { 
+  AuthAdmin, 
+  adminLogin as apiAdminLogin, 
+  adminLogout as apiAdminLogout, 
+  AdminLoginPayload, 
+  getAdminMe,
+  createAdmin as apiCreateAdmin,
+  activateAdmin as apiActivateAdmin,
+  CreateAdminPayload,
+  CreatedAdminData,
+  ActivateAdminPayload
+} from '../services/adminAuthService';
 import { getPublicCategories, getPublicProducts, archiveAdminProduct } from '../services/catalogueService';
 import { publishReview, rejectReview } from '../services/adminReviewService';
 import api, { tokenStore, retryWithBackoff } from '../services/api';
@@ -210,9 +221,13 @@ interface AppContextType {
 
   // Admin Actions
   /** Connexion admin réelle : appelle POST /api/admin/auth/login */
-  adminLogin: (payload: AdminLoginPayload) => Promise<void>;
+  adminLogin: (payload: AdminLoginPayload) => Promise<AuthAdmin>;
   /** Déconnexion admin réelle : appelle POST /api/admin/auth/logout */
   adminLogout: () => Promise<void>;
+  /** Création d'un admin par le super admin */
+  createAdmin: (payload: CreateAdminPayload) => Promise<CreatedAdminData>;
+  /** Activation d'un admin */
+  activateAdmin: (payload: ActivateAdminPayload) => Promise<void>;
   upsertProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus, note?: string) => void;
@@ -232,14 +247,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authLoading, setAuthLoading] = useState(true);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
 
-  // ─── Initialisation avec le cache localStorage (affichage instantané) ────
+ 
   const initialCache = readCatalogCache();
   const [products, setProducts] = useState<Product[]>(initialCache?.products ?? []);
   const [categories, setCategories] = useState<Category[]>(initialCache?.categories ?? []);
-  /**
-   * catalogLoading = true UNIQUEMENT si aucun cache n'est disponible.
-   * Si on a un cache (même périmé), on l'affiche immédiatement et on revalide en arrière-plan.
-   */
+  
   const [catalogLoading, setCatalogLoading] = useState<boolean>(!initialCache);
   const initialCacheRef = useRef(initialCache);
 
@@ -492,14 +504,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ADMIN ACTIONS
-  const adminLoginFn = useCallback(async (payload: AdminLoginPayload): Promise<void> => {
+  const adminLoginFn = useCallback(async (payload: AdminLoginPayload): Promise<AuthAdmin> => {
     const admin = await apiAdminLogin(payload);
     setAdminUser(admin);
+    return admin;
   }, []);
 
   const adminLogoutFn = useCallback(async (): Promise<void> => {
     await apiAdminLogout();
     setAdminUser(null);
+  }, []);
+
+  const createAdminFn = useCallback(async (payload: CreateAdminPayload): Promise<CreatedAdminData> => {
+    return await apiCreateAdmin(payload);
+  }, []);
+
+  const activateAdminFn = useCallback(async (payload: ActivateAdminPayload): Promise<void> => {
+    await apiActivateAdmin(payload);
   }, []);
 
   const upsertProduct = (product: Product) => {
@@ -582,7 +603,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToCart, removeFromCart, updateQuantity, 
       toggleWishlist, login, register, logout, getProductById,
       clearCart, addOrder, addAddress, removeAddress,
-      adminLogin: adminLoginFn, adminLogout: adminLogoutFn, upsertProduct, deleteProduct,
+      adminLogin: adminLoginFn, adminLogout: adminLogoutFn, 
+      createAdmin: createAdminFn, activateAdmin: activateAdminFn,
+      upsertProduct, deleteProduct,
       updateOrderStatus, moderateReview, upsertPromotion, updateSettings, refreshCatalog
     }}>
       {children}
