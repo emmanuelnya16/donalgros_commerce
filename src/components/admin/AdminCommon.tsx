@@ -16,7 +16,8 @@ import {
   X,
   Bell,
   Search,
-  User
+  User,
+  BarChart2,
 } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { fetchOrders } from '../../services/adminOrderService';
@@ -79,6 +80,7 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed, activeTab, setActive
     ? [
         { section: 'GENERAL', items: [
           { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard },
+          { id: 'analytics', label: 'Analytiques', icon: BarChart2 },
         ]},
         { section: 'CATALOGUE', items: [
           { id: 'products', label: 'Produits', icon: Package },

@@ -28,6 +28,7 @@ export const Header = () => {
     { label: language === 'fr' ? 'CATALOGUE' : 'CATALOG', href: '#catalogue', isNew: false, isSale: false },
     { label: language === 'fr' ? 'SOLDES' : 'SALE', href: '#catalogue?filter=sale', isNew: false, isSale: true },
     { label: language === 'fr' ? 'PROMOTIONS' : 'PROMOTIONS', href: '#catalogue?filter=promo', isNew: false, isSale: false },
+    { label: language === 'fr' ? '⭐ FIDÉLITÉ' : '⭐ LOYALTY', href: '#fidelite', isNew: true, isSale: false },
   ];
 
   return (

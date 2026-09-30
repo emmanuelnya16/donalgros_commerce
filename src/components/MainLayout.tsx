@@ -212,7 +212,7 @@ export const Footer = () => {
               { label: language === 'fr' ? 'Mes Commandes' : 'My Orders', href: '#profile?tab=orders' },
               { label: language === 'fr' ? 'Mes Favoris' : 'My Favorites', href: '#wishlist' },
               { label: language === 'fr' ? 'Mes Adresses' : 'My Addresses', href: '#profile?tab=addresses' },
-              { label: language === 'fr' ? 'Suivi de Commande' : 'Order Tracking', href: '#' },
+              { label: language === 'fr' ? '⭐ Programme Fidélité' : '⭐ Loyalty Program', href: '#fidelite' },
             ]} 
           />
 

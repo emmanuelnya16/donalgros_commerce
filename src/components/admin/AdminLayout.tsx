@@ -14,6 +14,7 @@ import { AdminLogin } from './AdminLogin';
 import { AdminCategories } from './AdminCategories';
 import { AdminActivate } from './AdminActivate';
 import { AdminTeam } from './AdminTeam';
+import { AdminAnalytics } from './AdminAnalytics';
 
 const AdminForbidden = () => (
   <div className="bg-white p-12 text-center rounded-3xl border border-red-100 shadow-xl max-w-lg mx-auto my-12 space-y-6">
@@ -78,6 +79,7 @@ export const AdminLayout = () => {
   const getPageTitle = () => {
     switch (adminTab) {
       case 'dashboard': return 'Tableau de Bord';
+      case 'analytics': return 'Analytiques GA4';
       case 'products': return 'Gestion des Produits';
       case 'categories': return 'Arborescence Catalogue';
       case 'stocks': return 'Suivi des Stocks';
@@ -104,6 +106,7 @@ export const AdminLayout = () => {
 
     switch (adminTab) {
       case 'dashboard': return <AdminDashboard />;
+      case 'analytics': return <AdminAnalytics />;
       case 'products': return <AdminCatalog />;
       case 'orders': return <AdminOrders />;
       case 'clients': return <AdminCustomers />;

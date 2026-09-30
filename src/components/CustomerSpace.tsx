@@ -3,17 +3,20 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Package, User, MapPin, Heart, LogOut, ChevronRight, 
   ShoppingBag, Clock, CheckCircle2, Truck, Plus, Trash2,
-  Edit, Globe, Smartphone, ShieldCheck, RefreshCw, AlertCircle
+  Edit, Globe, Smartphone, ShieldCheck, RefreshCw, AlertCircle,
+  Gift, Trophy, Crown, Sparkles, Award, Store, ArrowRight, Star, Check
 } from 'lucide-react';
 import { useAppContext, Order, Address } from '../context/AppContext';
 import { translations } from '../translations';
 import { getMyOrderHistory, type OrderResponse } from '../services/catalogueService';
+import { calculateLoyaltyProfile, calculateOrderPoints, GIFT_MILESTONES, type GiftMilestone } from '../utils/loyalty';
 
 export const CustomerSpace = () => {
   const { user, orders, addresses, wishlist, logout, toggleWishlist, removeAddress, addAddress, language } = useAppContext();
   const t = translations[language];
   const [activeTab, setActiveTab] = React.useState(() => {
     if (window.location.hash.startsWith('#wishlist')) return 'favorites';
+    if (window.location.hash.startsWith('#loyalty') || window.location.hash.startsWith('#fidelite')) return 'loyalty';
     const params = new URLSearchParams(window.location.hash.split('?')[1]);
     return params.get('tab') || 'orders';
   });
@@ -32,9 +35,9 @@ export const CustomerSpace = () => {
     details: ''
   });
 
-  // Charger les commandes depuis le backend quand l'onglet est actif
+  // Charger les commandes depuis le backend dès que l'utilisateur est connecté
   React.useEffect(() => {
-    if (activeTab !== 'orders' || !user) return;
+    if (!user) return;
     let cancelled = false;
     const load = async () => {
       setOrdersLoading(true);
@@ -57,12 +60,21 @@ export const CustomerSpace = () => {
     load();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, user]);
+  }, [user]);
+
+  // Calcul du profil fidélité réactif basé sur les commandes réelles
+  const loyaltyProfile = React.useMemo(() => {
+    return calculateLoyaltyProfile(apiOrders, orders);
+  }, [apiOrders, orders]);
 
   React.useEffect(() => {
     const handleHashChange = () => {
       if (window.location.hash.startsWith('#wishlist')) {
         setActiveTab('favorites');
+        return;
+      }
+      if (window.location.hash.startsWith('#loyalty') || window.location.hash.startsWith('#fidelite')) {
+        setActiveTab('loyalty');
         return;
       }
       const params = new URLSearchParams(window.location.hash.split('?')[1]);
@@ -80,6 +92,7 @@ export const CustomerSpace = () => {
 
   const tabs = [
     { id: 'orders', label: t.myOrdersTab, icon: <Package className="w-5 h-5" /> },
+    { id: 'loyalty', label: t.loyaltyTab, icon: <Gift className="w-5 h-5 text-amber-500" /> },
     { id: 'profile', label: t.myProfileTab, icon: <User className="w-5 h-5" /> },
     { id: 'favorites', label: t.myFavoritesTab, icon: <Heart className="w-5 h-5" /> },
     { id: 'addresses', label: t.myAddressesTab, icon: <MapPin className="w-5 h-5" /> },
@@ -115,16 +128,21 @@ export const CustomerSpace = () => {
                   }}
                   className={`flex items-center gap-4 px-4 py-3.5 rounded-xl font-bold transition-all text-left ${activeTab === tab.id ? 'bg-primary-blue text-white shadow-xl shadow-primary-blue/20' : 'text-medium-gray hover:bg-light-gray hover:text-dark-gray'}`}
                 >
-                  <span className={activeTab === tab.id ? 'text-white' : 'text-primary-blue'}>{tab.icon}</span>
+                  <span className={activeTab === tab.id ? 'text-white' : ''}>{tab.icon}</span>
                   {tab.label}
+                  {tab.id === 'loyalty' && loyaltyProfile.totalPoints > 0 && (
+                    <span className={`ml-auto px-2 py-0.5 rounded-full text-[11px] font-black ${activeTab === tab.id ? 'bg-white text-primary-blue' : 'bg-amber-100 text-amber-800'}`}>
+                      {loyaltyProfile.totalPoints} pts
+                    </span>
+                  )}
                   {tab.id === 'favorites' && wishlist.length > 0 && (
                     <span className={`ml-auto w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black ${activeTab === tab.id ? 'bg-white text-primary-blue' : 'bg-red-500 text-white'}`}>
                       {wishlist.length}
                     </span>
                   )}
-                  {tab.id === 'orders' && orders.length > 0 && (
+                  {tab.id === 'orders' && (apiOrders.length > 0 || orders.length > 0) && (
                     <span className={`ml-auto w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black ${activeTab === tab.id ? 'bg-white text-primary-blue' : 'bg-primary-blue text-white'}`}>
-                      {orders.length}
+                      {apiOrders.length || orders.length}
                     </span>
                   )}
                   <ChevronRight className={`w-4 h-4 ml-auto ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'}`} />
@@ -204,6 +222,233 @@ export const CustomerSpace = () => {
               </motion.div>
             )}
 
+            {/* Onglet Fidélité & Cadeaux */}
+            {activeTab === 'loyalty' && (
+              <motion.div 
+                key="loyalty" 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                exit={{ opacity: 0, y: -20 }}
+                className="space-y-8"
+              >
+                <div>
+                  <h1 className="text-3xl font-display font-black text-dark-gray flex items-center gap-3">
+                    <Gift className="w-8 h-8 text-amber-500" />
+                    {t.loyaltyTitle}
+                  </h1>
+                  <p className="text-medium-gray mt-1">{t.loyaltySub}</p>
+                </div>
+
+                {/* Carte VIP Virtuelle de Luxe */}
+                <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 text-white p-8 md:p-10 shadow-2xl border border-amber-500/20">
+                  {/* Motifs géométriques & lueurs dorées */}
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 w-80 h-80 bg-primary-blue/20 rounded-full blur-3xl pointer-events-none" />
+
+                  <div className="relative z-10 flex flex-col justify-between gap-8 min-h-[220px]">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-600 flex items-center justify-center shadow-lg text-slate-950 font-black">
+                          <Crown className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-widest text-amber-300/80 font-bold">Donald Gros Club</p>
+                          <h3 className="font-display font-black text-xl text-white tracking-wide">{user.fullName}</h3>
+                        </div>
+                      </div>
+                      <span className="px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {language === 'fr' ? loyaltyProfile.tier.nameFr : loyaltyProfile.tier.nameEn}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-white/10 items-end">
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-white/60 font-bold mb-1">{t.loyaltyPointsBalance}</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl md:text-5xl font-display font-black text-amber-400">
+                            {loyaltyProfile.totalPoints.toLocaleString()}
+                          </span>
+                          <span className="text-lg font-bold text-amber-200/80">pts</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-white/60 font-bold mb-1">{t.loyaltyOrdersCount}</p>
+                        <p className="text-2xl font-bold text-white">
+                          {loyaltyProfile.eligibleOrdersCount} {language === 'fr' ? 'commandes' : 'orders'}
+                        </p>
+                      </div>
+
+                      <div className="md:text-right">
+                        <p className="text-xs uppercase tracking-widest text-white/60 font-bold mb-1">{t.loyaltyNextMilestone}</p>
+                        <p className="text-sm font-bold text-amber-300">
+                          {loyaltyProfile.nextMilestone 
+                            ? `${loyaltyProfile.nextMilestone.pointsRequired.toLocaleString()} pts (${language === 'fr' ? loyaltyProfile.nextMilestone.titleFr : loyaltyProfile.nextMilestone.titleEn})`
+                            : (language === 'fr' ? 'Palier Maximum Atteint 🎉' : 'Maximum Milestone Reached 🎉')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Jauge de progression vers le prochain cadeau */}
+                <div className="bg-white p-8 rounded-3xl border border-light-gray shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="font-display font-bold text-lg text-dark-gray flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-amber-500" />
+                        {loyaltyProfile.nextMilestone 
+                          ? (language === 'fr' 
+                              ? `Objectif : ${loyaltyProfile.nextMilestone.titleFr}` 
+                              : `Goal: ${loyaltyProfile.nextMilestone.titleEn}`)
+                          : (language === 'fr' ? 'Félicitations pour votre fidélité !' : 'Congratulations on your loyalty!')}
+                      </h3>
+                      <p className="text-sm text-medium-gray">
+                        {loyaltyProfile.nextMilestone 
+                          ? (language === 'fr' 
+                              ? `Plus que ${loyaltyProfile.pointsToNextMilestone.toLocaleString()} points pour débloquer votre prochain cadeau en boutique !` 
+                              : `Only ${loyaltyProfile.pointsToNextMilestone.toLocaleString()} points left to unlock your next in-store gift!`)
+                          : (language === 'fr' 
+                              ? 'Vous avez débloqué tous nos paliers de cadeaux actuels !' 
+                              : 'You have unlocked all current reward tiers!')}
+                      </p>
+                    </div>
+                    <span className="text-2xl font-display font-black text-primary-blue">
+                      {loyaltyProfile.totalPoints} / {loyaltyProfile.nextMilestone ? loyaltyProfile.nextMilestone.pointsRequired : loyaltyProfile.totalPoints} pts
+                    </span>
+                  </div>
+
+                  {/* Barre animée */}
+                  <div className="w-full h-4 bg-light-gray rounded-full overflow-hidden p-0.5">
+                    <div 
+                      className="h-full bg-gradient-to-r from-amber-400 via-amber-500 to-primary-green rounded-full transition-all duration-1000 shadow-sm"
+                      style={{ width: `${loyaltyProfile.progressPercentage}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Paliers Cadeaux en Boutique */}
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-2xl font-display font-black text-dark-gray flex items-center gap-2">
+                      <Store className="w-6 h-6 text-primary-blue" />
+                      {t.loyaltyGiftsTitle}
+                    </h2>
+                    <p className="text-sm text-medium-gray">{t.loyaltyGiftsSub}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {GIFT_MILESTONES.map((milestone) => {
+                      const isUnlocked = loyaltyProfile.totalPoints >= milestone.pointsRequired;
+                      return (
+                        <div 
+                          key={milestone.id}
+                          className={`relative p-6 rounded-3xl border transition-all ${
+                            isUnlocked 
+                              ? 'bg-gradient-to-br from-green-50/70 via-white to-amber-50/50 border-primary-green/40 shadow-md ring-2 ring-primary-green/20' 
+                              : 'bg-white border-light-gray opacity-90'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-4 mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md bg-gradient-to-tr ${milestone.badgeColor}`}>
+                                {milestone.iconName === 'crown' ? <Crown className="w-6 h-6" /> :
+                                 milestone.iconName === 'trophy' ? <Trophy className="w-6 h-6" /> :
+                                 milestone.iconName === 'sparkles' ? <Sparkles className="w-6 h-6" /> :
+                                 <Gift className="w-6 h-6" />}
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-medium-gray block">
+                                  {milestone.pointsRequired.toLocaleString()} Points
+                                </span>
+                                <h4 className="font-display font-black text-lg text-dark-gray">
+                                  {language === 'fr' ? milestone.titleFr : milestone.titleEn}
+                                </h4>
+                              </div>
+                            </div>
+
+                            {isUnlocked ? (
+                              <span className="px-3 py-1 bg-green-100 text-green-800 text-[11px] font-black rounded-full flex items-center gap-1 shrink-0">
+                                <Check className="w-3.5 h-3.5" />
+                                {t.loyaltyUnlocked}
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 bg-light-gray text-medium-gray text-[11px] font-bold rounded-full shrink-0">
+                                {language === 'fr' ? `Encore ${milestone.pointsRequired - loyaltyProfile.totalPoints} pts` : `${milestone.pointsRequired - loyaltyProfile.totalPoints} pts left`}
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-sm text-medium-gray mb-4">
+                            {language === 'fr' ? milestone.descriptionFr : milestone.descriptionEn}
+                          </p>
+
+                          <div className="flex items-center justify-between pt-3 border-t border-light-gray/60 text-xs">
+                            <span className="font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg">
+                              {milestone.rewardValueLabel}
+                            </span>
+                            <span className="text-medium-gray italic font-medium flex items-center gap-1">
+                              <Store className="w-3.5 h-3.5 text-primary-blue" />
+                              {language === 'fr' ? 'Retrait boutique' : 'In-store pickup'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Explication du fonctionnement & Retrait en Boutique */}
+                <div className="bg-primary-blue/5 p-8 rounded-3xl border border-primary-blue/15 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-primary-blue text-white rounded-2xl flex items-center justify-center shadow-md">
+                      <Store className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-display font-black text-xl text-dark-gray">{t.loyaltyHowItWorksTitle}</h3>
+                      <p className="text-sm text-medium-gray">{t.loyaltyStoreNotice}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="bg-white p-5 rounded-2xl border border-primary-blue/10 space-y-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 text-primary-blue font-black flex items-center justify-center text-sm">1</div>
+                      <h4 className="font-bold text-dark-gray">{language === 'fr' ? 'Commandez sur le site' : 'Order online'}</h4>
+                      <p className="text-xs text-medium-gray">{t.loyaltyRule1}</p>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-2xl border border-primary-blue/10 space-y-2">
+                      <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 font-black flex items-center justify-center text-sm">2</div>
+                      <h4 className="font-bold text-dark-gray">{language === 'fr' ? 'Atteignez 1 000 points' : 'Reach 1,000 points'}</h4>
+                      <p className="text-xs text-medium-gray">{t.loyaltyRule2}</p>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-2xl border border-primary-blue/10 space-y-2">
+                      <div className="w-8 h-8 rounded-full bg-green-50 text-primary-green font-black flex items-center justify-center text-sm">3</div>
+                      <h4 className="font-bold text-dark-gray">{language === 'fr' ? 'Récupérez en boutique' : 'Collect in store'}</h4>
+                      <p className="text-xs text-medium-gray">{t.loyaltyRule3}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                    <p className="text-xs text-medium-gray italic">
+                      {language === 'fr' 
+                        ? '📞 Contact service fidélité : +237 6XX XXX XXX • Nos conseillers sont là pour vous accueillir.' 
+                        : '📞 Loyalty customer desk: +237 6XX XXX XXX • Our team is ready to welcome you.'}
+                    </p>
+                    <button 
+                      onClick={() => window.location.hash = 'catalogue'}
+                      className="px-6 py-3 bg-primary-blue text-white rounded-xl font-bold text-sm hover:scale-105 transition-transform flex items-center gap-2 shrink-0 shadow-lg shadow-primary-blue/20"
+                    >
+                      <ShoppingBag className="w-4 h-4" />
+                      {language === 'fr' ? 'Faire des achats & Gagner des points' : 'Shop & Earn Points'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {activeTab === 'profile' && (
               <motion.div 
                 key="profile" 
@@ -214,6 +459,44 @@ export const CustomerSpace = () => {
               >
                 <h1 className="text-3xl font-display font-black text-dark-gray">{t.myProfileTab}</h1>
                 
+                {/* Encart Résumé Programme Fidélité dans Mon Profil */}
+                <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 rounded-3xl p-6 md:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center shrink-0 border border-white/20">
+                      <Gift className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-white/20 text-white">
+                          {language === 'fr' ? loyaltyProfile.tier.nameFr : loyaltyProfile.tier.nameEn}
+                        </span>
+                      </div>
+                      <h3 className="font-display font-black text-2xl mt-1 text-white">
+                        {loyaltyProfile.totalPoints.toLocaleString()} {t.loyaltyPointsBalance}
+                      </h3>
+                      <p className="text-sm text-white/80 mt-0.5">
+                        {loyaltyProfile.nextMilestone 
+                          ? (language === 'fr' 
+                              ? `Encore ${loyaltyProfile.pointsToNextMilestone.toLocaleString()} pts pour votre cadeau boutique de ${loyaltyProfile.nextMilestone.pointsRequired} pts !` 
+                              : `Only ${loyaltyProfile.pointsToNextMilestone.toLocaleString()} pts to unlock your in-store gift!`)
+                          : (language === 'fr' ? 'Vous avez débloqué tous les cadeaux actuels !' : 'All milestone gifts unlocked!')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('loyalty');
+                      window.location.hash = 'profile?tab=loyalty';
+                    }}
+                    className="px-6 py-3.5 bg-white text-dark-gray rounded-xl font-bold text-sm hover:scale-105 transition-transform flex items-center justify-center gap-2 shrink-0 shadow-lg"
+                  >
+                    <Trophy className="w-4 h-4 text-amber-600" />
+                    {t.viewMyLoyalty}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="bg-white p-8 rounded-3xl border border-light-gray shadow-sm space-y-6">
                     <div className="flex items-center justify-between">
@@ -513,6 +796,14 @@ const OrderCard: React.FC<{ order: Order }> = ({ order }) => {
                  </span>
                  <span className="w-1 h-1 bg-light-gray rounded-full" />
                  <span className="text-medium-gray">{order.items.length} {language === 'fr' ? 'articles' : 'items'}</span>
+                 {calculateOrderPoints(order.total) > 0 && (
+                   <>
+                     <span className="w-1 h-1 bg-light-gray rounded-full" />
+                     <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 font-black">
+                       +{calculateOrderPoints(order.total)} pts ⭐
+                     </span>
+                   </>
+                 )}
               </div>
            </div>
            <button 
@@ -664,6 +955,11 @@ const ApiOrderCard: React.FC<{ order: OrderResponse }> = ({ order }) => {
               <span className="text-[10px] font-bold text-medium-gray">
                 {order.items.length} {language === 'fr' ? 'articles' : 'items'}
               </span>
+              {calculateOrderPoints(order.totalAmount) > 0 && (
+                <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80">
+                  +{calculateOrderPoints(order.totalAmount)} pts ⭐
+                </span>
+              )}
             </div>
           </div>
           <button

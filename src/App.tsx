@@ -4,15 +4,20 @@
  */
 
 import React from 'react';
+import ReactGA from 'react-ga4';
+
+// ─── Google Analytics 4 ──────────────────────────────────────────────────────
+ReactGA.initialize('G-J244J03SRF');
 import { AppProvider, useAppContext, Product } from './context/AppContext';
 import { TopBar, BenefitBar, PromotionalMarquee } from './components/PromoBands';
 import { Header } from './components/Header';
-import { Trash2, Plus, Minus, ArrowLeft, ShoppingCart, Heart, Package, ShieldCheck, Truck, RotateCcw } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowLeft, ShoppingCart, Heart, Package, ShieldCheck, Truck, RotateCcw, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations } from './translations';
 import { PageLoader, SkeletonSection, SkeletonCategoryRow } from './components/LoadingComponents';
 import { getNewArrivals, getBestSellers, getOnSaleProducts } from './services/catalogueService';
 import { retryWithBackoff } from './services/api';
+import { calculateOrderPoints } from './utils/loyalty';
 
 // ─── Lazy-loaded heavy page components ───
 const HeroBanner = React.lazy(() => import('./components/HeroBanner').then(m => ({ default: m.HeroBanner })));
@@ -28,6 +33,7 @@ const ProductDetailPage = React.lazy(() => import('./components/ProductDetailPag
 const CheckoutTunnel = React.lazy(() => import('./components/CheckoutTunnel').then(m => ({ default: m.CheckoutTunnel })));
 const CustomerSpace = React.lazy(() => import('./components/CustomerSpace').then(m => ({ default: m.CustomerSpace })));
 const AdminLayout = React.lazy(() => import('./components/admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
+const LoyaltyPublicPage = React.lazy(() => import('./components/LoyaltyPublicPage').then(m => ({ default: m.LoyaltyPublicPage })));
 
 function HomePage() {
   const { language, catalogLoading } = useAppContext();
@@ -226,6 +232,25 @@ function CartPage() {
                 <span className="text-2xl font-display font-black text-primary-blue">{subtotal.toLocaleString()} FCFA</span>
               </div>
             </div>
+
+            {calculateOrderPoints(subtotal) > 0 && (
+              <div className="mb-6 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl flex items-center gap-3 text-xs text-amber-900 shadow-sm">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Gift className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold">
+                    {language === 'fr' ? 'Bonus Fidélité Donald Gros' : 'Donald Gros Loyalty Bonus'}
+                  </p>
+                  <p className="text-[11px] text-amber-800">
+                    {language === 'fr' 
+                      ? <>Cette commande vous rapporte <strong className="font-black text-amber-950">+{calculateOrderPoints(subtotal)} points</strong> pour débloquer votre cadeau !</>
+                      : <>This order earns you <strong className="font-black text-amber-950">+{calculateOrderPoints(subtotal)} points</strong> towards store gifts!</>}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <button 
               onClick={() => window.location.hash = 'checkout'}
               className="w-full h-14 bg-primary-blue text-white font-display font-bold rounded-xl shadow-xl hover:bg-dark-gray transition-all transform hover:scale-[1.02] active:scale-[0.98]"
@@ -284,12 +309,16 @@ function AppContent() {
       const baseRoute = hash.split('?')[0];
       setRoute(baseRoute || 'home');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      // ── GA4 : envoyer un pageview à chaque navigation ──
+      ReactGA.send({ hitType: 'pageview', page: '/' + (baseRoute || '') });
     };
     const handleScroll = () => {
       setShowBackToTop(window.scrollY > 1000);
     };
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('scroll', handleScroll);
+    // Envoyer le pageview de la page initiale
+    ReactGA.send({ hitType: 'pageview', page: '/' + (route || 'home') });
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('scroll', handleScroll);
@@ -306,8 +335,10 @@ function AppContent() {
     return null;
   }
 
-  // Admin routing check
-  if (route.startsWith('admin')) {
+  // Admin routing check — on lit directement le hash pour éviter les décalages
+  // entre le state `route` et le hash réel (condition de course après authLoading)
+  const liveHash = window.location.hash.replace('#', '').split('?')[0];
+  if (route.startsWith('admin') || liveHash.startsWith('admin')) {
     return (
       <React.Suspense fallback={<PageLoader message="Chargement du panneau admin…" />}>
         <AdminLayout />
@@ -330,6 +361,7 @@ function AppContent() {
           {route.startsWith('produits/') && (
             <ProductDetailPage productId={route.split('/')[1]} />
           )}
+          {route === 'fidelite' && <LoyaltyPublicPage />}
           {(route === 'login' || route === 'signup') && (
             <AuthPages 
               mode={route as 'login' | 'signup'} 
