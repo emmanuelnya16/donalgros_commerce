@@ -9,7 +9,7 @@ import {
 import { useAppContext, Order, Address } from '../context/AppContext';
 import { translations } from '../translations';
 import { getMyOrderHistory, type OrderResponse } from '../services/catalogueService';
-import { calculateLoyaltyProfile, calculateOrderPoints, GIFT_MILESTONES, type GiftMilestone } from '../utils/loyalty';
+import { calculateLoyaltyProfile, calculateOrderPoints, calculatePointsValue, GIFT_MILESTONES, type GiftMilestone } from '../utils/loyalty';
 
 export const CustomerSpace = () => {
   const { user, orders, addresses, wishlist, logout, toggleWishlist, removeAddress, addAddress, language } = useAppContext();
@@ -132,7 +132,7 @@ export const CustomerSpace = () => {
                   {tab.label}
                   {tab.id === 'loyalty' && loyaltyProfile.totalPoints > 0 && (
                     <span className={`ml-auto px-2 py-0.5 rounded-full text-[11px] font-black ${activeTab === tab.id ? 'bg-white text-primary-blue' : 'bg-amber-100 text-amber-800'}`}>
-                      {loyaltyProfile.totalPoints} pts
+                      {loyaltyProfile.totalPoints} pts ({loyaltyProfile.totalRewardFcfa.toLocaleString()} F)
                     </span>
                   )}
                   {tab.id === 'favorites' && wishlist.length > 0 && (
@@ -265,11 +265,14 @@ export const CustomerSpace = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-white/10 items-end">
                       <div>
                         <p className="text-xs uppercase tracking-widest text-white/60 font-bold mb-1">{t.loyaltyPointsBalance}</p>
-                        <div className="flex items-baseline gap-2">
+                        <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="text-4xl md:text-5xl font-display font-black text-amber-400">
                             {loyaltyProfile.totalPoints.toLocaleString()}
                           </span>
                           <span className="text-lg font-bold text-amber-200/80">pts</span>
+                          <span className="text-xs font-black text-amber-950 bg-amber-300 px-2.5 py-0.5 rounded-full shadow-sm">
+                            = {loyaltyProfile.totalRewardFcfa.toLocaleString()} FCFA
+                          </span>
                         </div>
                       </div>
 
@@ -420,7 +423,7 @@ export const CustomerSpace = () => {
 
                     <div className="bg-white p-5 rounded-2xl border border-primary-blue/10 space-y-2">
                       <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 font-black flex items-center justify-center text-sm">2</div>
-                      <h4 className="font-bold text-dark-gray">{language === 'fr' ? 'Atteignez 1 000 points' : 'Reach 1,000 points'}</h4>
+                      <h4 className="font-bold text-dark-gray">{language === 'fr' ? 'Atteignez les paliers (dès 10 pts)' : 'Reach milestones (from 10 pts)'}</h4>
                       <p className="text-xs text-medium-gray">{t.loyaltyRule2}</p>
                     </div>
 
@@ -470,9 +473,13 @@ export const CustomerSpace = () => {
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-white/20 text-white">
                           {language === 'fr' ? loyaltyProfile.tier.nameFr : loyaltyProfile.tier.nameEn}
                         </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-300 text-amber-950">
+                          1 article = 1 pt = 10 FCFA
+                        </span>
                       </div>
-                      <h3 className="font-display font-black text-2xl mt-1 text-white">
-                        {loyaltyProfile.totalPoints.toLocaleString()} {t.loyaltyPointsBalance}
+                      <h3 className="font-display font-black text-2xl mt-1 text-white flex items-baseline gap-2 flex-wrap">
+                        <span>{loyaltyProfile.totalPoints.toLocaleString()} {t.loyaltyPointsBalance}</span>
+                        <span className="text-sm font-bold text-amber-200">(= {loyaltyProfile.totalRewardFcfa.toLocaleString()} FCFA)</span>
                       </h3>
                       <p className="text-sm text-white/80 mt-0.5">
                         {loyaltyProfile.nextMilestone 
@@ -796,11 +803,11 @@ const OrderCard: React.FC<{ order: Order }> = ({ order }) => {
                  </span>
                  <span className="w-1 h-1 bg-light-gray rounded-full" />
                  <span className="text-medium-gray">{order.items.length} {language === 'fr' ? 'articles' : 'items'}</span>
-                 {calculateOrderPoints(order.total) > 0 && (
+                 {calculateOrderPoints(order.items) > 0 && (
                    <>
                      <span className="w-1 h-1 bg-light-gray rounded-full" />
                      <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 font-black">
-                       +{calculateOrderPoints(order.total)} pts ⭐
+                       +{calculateOrderPoints(order.items)} pts ⭐ ({calculatePointsValue(calculateOrderPoints(order.items))} F)
                      </span>
                    </>
                  )}
@@ -955,9 +962,9 @@ const ApiOrderCard: React.FC<{ order: OrderResponse }> = ({ order }) => {
               <span className="text-[10px] font-bold text-medium-gray">
                 {order.items.length} {language === 'fr' ? 'articles' : 'items'}
               </span>
-              {calculateOrderPoints(order.totalAmount) > 0 && (
-                <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80">
-                  +{calculateOrderPoints(order.totalAmount)} pts ⭐
+              {calculateOrderPoints(order.items && order.items.length > 0 ? order.items : 1) > 0 && (
+                <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80" title={`${calculatePointsValue(calculateOrderPoints(order.items && order.items.length > 0 ? order.items : 1))} FCFA de valeur`}>
+                  +{calculateOrderPoints(order.items && order.items.length > 0 ? order.items : 1)} pts ⭐ ({calculatePointsValue(calculateOrderPoints(order.items && order.items.length > 0 ? order.items : 1))} F)
                 </span>
               )}
             </div>

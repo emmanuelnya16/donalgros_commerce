@@ -17,7 +17,7 @@ import { translations } from './translations';
 import { PageLoader, SkeletonSection, SkeletonCategoryRow } from './components/LoadingComponents';
 import { getNewArrivals, getBestSellers, getOnSaleProducts } from './services/catalogueService';
 import { retryWithBackoff } from './services/api';
-import { calculateOrderPoints } from './utils/loyalty';
+import { calculateOrderPoints, calculatePointsValue } from './utils/loyalty';
 
 // ─── Lazy-loaded heavy page components ───
 const HeroBanner = React.lazy(() => import('./components/HeroBanner').then(m => ({ default: m.HeroBanner })));
@@ -233,23 +233,33 @@ function CartPage() {
               </div>
             </div>
 
-            {calculateOrderPoints(subtotal) > 0 && (
-              <div className="mb-6 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl flex items-center gap-3 text-xs text-amber-900 shadow-sm">
-                <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <Gift className="w-4 h-4" />
+            {cart.length > 0 && (() => {
+              const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
+              const pointsEarned = calculateOrderPoints(totalItems);
+              const pointsValue = calculatePointsValue(pointsEarned);
+              if (pointsEarned <= 0) return null;
+
+              return (
+                <div className="mb-6 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl flex items-center gap-3 text-xs text-amber-900 shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <Gift className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-bold flex items-center gap-2">
+                      <span>{language === 'fr' ? 'Bonus Fidélité Donald Gros' : 'Donald Gros Loyalty Bonus'}</span>
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900">
+                        1 article = 1 pt = 10 FCFA
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-amber-800 mt-0.5">
+                      {language === 'fr' 
+                        ? <>Cette commande ({totalItems} {totalItems > 1 ? 'articles' : 'article'}) vous rapporte <strong className="font-black text-amber-950">+{pointsEarned} points</strong> (valeur : <strong className="font-black text-amber-950">{pointsValue.toLocaleString()} FCFA</strong>) !</>
+                        : <>This order ({totalItems} {totalItems > 1 ? 'items' : 'item'}) earns you <strong className="font-black text-amber-950">+{pointsEarned} points</strong> (worth <strong className="font-black text-amber-950">{pointsValue.toLocaleString()} FCFA</strong>)!</>}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-bold">
-                    {language === 'fr' ? 'Bonus Fidélité Donald Gros' : 'Donald Gros Loyalty Bonus'}
-                  </p>
-                  <p className="text-[11px] text-amber-800">
-                    {language === 'fr' 
-                      ? <>Cette commande vous rapporte <strong className="font-black text-amber-950">+{calculateOrderPoints(subtotal)} points</strong> pour débloquer votre cadeau !</>
-                      : <>This order earns you <strong className="font-black text-amber-950">+{calculateOrderPoints(subtotal)} points</strong> towards store gifts!</>}
-                  </p>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             <button 
               onClick={() => window.location.hash = 'checkout'}

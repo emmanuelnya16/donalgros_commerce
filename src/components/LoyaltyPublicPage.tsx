@@ -6,7 +6,7 @@ import {
   User, TrendingUp, Award, Zap
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { GIFT_MILESTONES, calculateOrderPoints } from '../utils/loyalty';
+import { GIFT_MILESTONES, calculateOrderPoints, calculatePointsValue } from '../utils/loyalty';
 
 // ─── Mini composant : compteur animé au scroll ───────────────────────────────
 const Counter = ({ end, suffix = '' }: { end: number; suffix?: string }) => {
@@ -78,7 +78,7 @@ export const LoyaltyPublicPage = () => {
       title: fr ? 'Vous gagnez des points' : 'You earn points',
       body: fr
         ? 'La règle est simple et permanente : 1 000 FCFA dépensés = 10 points. Ils s\'accumulent sans limite de temps sur toutes vos commandes valides.'
-        : 'The rule is simple and permanent: 1,000 FCFA spent = 10 points. They accumulate without time limit across all your valid orders.',
+        : 'The rule is simple and permanent: 1 item purchased = 1 loyalty point = 10 FCFA reward. They accumulate without time limit across all your valid orders.',
       accent: '#f59e0b',
     },
     {
@@ -104,10 +104,10 @@ export const LoyaltyPublicPage = () => {
   ];
 
   const tiers = [
-    { emoji: '🥉', name: 'Bronze',  range: fr ? '0 – 2 499 pts'  : '0 – 2,499 pts',  col: 'border-amber-700/30 bg-amber-700/5', text: 'text-amber-700', ring: '#b45309' },
-    { emoji: '🥈', name: 'Silver',  range: fr ? '2 500 – 4 999 pts' : '2,500 – 4,999 pts', col: 'border-slate-400/30 bg-slate-400/5', text: 'text-slate-500', ring: '#94a3b8' },
-    { emoji: '🥇', name: 'Gold',    range: fr ? '5 000 – 9 999 pts' : '5,000 – 9,999 pts', col: 'border-yellow-500/30 bg-yellow-500/5', text: 'text-yellow-600', ring: '#eab308' },
-    { emoji: '💎', name: 'Platine', range: '10 000+ pts',            col: 'border-[#1a56db]/30 bg-[#1a56db]/5', text: 'text-[#1a56db]', ring: '#1a56db' },
+    { emoji: '🥉', name: 'Bronze',  range: fr ? '0 – 24 pts'  : '0 – 24 pts',  col: 'border-amber-700/30 bg-amber-700/5', text: 'text-amber-700', ring: '#b45309' },
+    { emoji: '🥈', name: 'Silver',  range: fr ? '25 – 49 pts' : '25 – 49 pts', col: 'border-slate-400/30 bg-slate-400/5', text: 'text-slate-500', ring: '#94a3b8' },
+    { emoji: '🥇', name: 'Gold',    range: fr ? '50 – 99 pts' : '50 – 99 pts', col: 'border-yellow-500/30 bg-yellow-500/5', text: 'text-yellow-600', ring: '#eab308' },
+    { emoji: '💎', name: 'Platine', range: '100+ pts',            col: 'border-[#1a56db]/30 bg-[#1a56db]/5', text: 'text-[#1a56db]', ring: '#1a56db' },
   ];
 
   const milestoneIcons: Record<string, React.ReactNode> = {
@@ -119,7 +119,13 @@ export const LoyaltyPublicPage = () => {
 
   const milestoneAccents = ['#f59e0b', '#94a3b8', '#eab308', '#1a56db'];
 
-  const calcExamples = [5000, 15000, 25000, 50000, 100000];
+  const calcExamples = [
+    { count: 1, label: fr ? '1 article' : '1 item' },
+    { count: 3, label: fr ? '3 articles' : '3 items' },
+    { count: 5, label: fr ? '5 articles' : '5 items' },
+    { count: 10, label: fr ? '10 articles' : '10 items' },
+    { count: 25, label: fr ? '25 articles' : '25 items' },
+  ];
 
   const faqs = [
     {
@@ -312,10 +318,10 @@ export const LoyaltyPublicPage = () => {
       <div className="bg-[#1a56db] py-12">
         <div className="max-w-[1280px] mx-auto px-6 md:px-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center text-white">
           {[
-            { end: 10, suffix: ' pts',    label: fr ? 'pour chaque 1 000 FCFA' : 'per 1,000 FCFA' },
-            { end: 1000, suffix: ' pts',  label: fr ? 'pour le 1er cadeau'     : 'for your 1st gift' },
-            { end: 4, suffix: '',         label: fr ? 'paliers de cadeaux'     : 'gift milestones' },
-            { end: 75000, suffix: ' FCFA', label: fr ? 'valeur du cadeau Platine' : 'Platinum gift value' },
+            { end: 1, suffix: ' pt',       label: fr ? 'par article acheté'        : 'per item purchased' },
+            { end: 10, suffix: ' FCFA',    label: fr ? 'valeur par point'          : 'value per point' },
+            { end: 10, suffix: ' pts',     label: fr ? 'pour le 1er cadeau'        : 'for your 1st gift' },
+            { end: 1000, suffix: ' FCFA',  label: fr ? 'valeur max cadeau Platine' : 'Platinum gift value' },
           ].map((s, i) => (
             <motion.div
               key={i}
@@ -412,14 +418,15 @@ export const LoyaltyPublicPage = () => {
               </h2>
             </div>
             <div className="bg-[#1a56db] text-white rounded-2xl px-5 py-3 font-display font-black text-sm shrink-0">
-              1 000 FCFA = 10 pts ⭐
+              1 article = 1 pt = 10 FCFA ⭐
             </div>
           </motion.div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {calcExamples.map((amount, i) => {
-              const pts = calculateOrderPoints(amount);
-              const pct = Math.min(100, Math.round((pts / 1000) * 100));
+            {calcExamples.map((ex, i) => {
+              const pts = calculateOrderPoints(ex.count);
+              const val = calculatePointsValue(pts);
+              const pct = Math.min(100, Math.round((pts / 10) * 100));
               return (
                 <motion.div
                   key={i}
@@ -430,13 +437,13 @@ export const LoyaltyPublicPage = () => {
                   className="bg-white rounded-3xl p-6 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center"
                 >
                   <p className="text-[#6b7280] text-xs font-sans font-bold uppercase tracking-wide mb-3">
-                    {fr ? 'Commande' : 'Order'}
+                    {ex.label}
                   </p>
                   <p className="font-display font-black text-[#111827] text-xl mb-4">
-                    {amount.toLocaleString('fr-FR')} <span className="text-sm font-sans font-bold text-[#6b7280]">FCFA</span>
+                    +{pts} <span className="text-sm font-sans font-bold text-[#6b7280]">points</span>
                   </p>
 
-                  {/* Jauge circulaire */}
+                  {/* Jauge circulaire vers 1er cadeau (10 pts) */}
                   <div className="relative flex items-center justify-center mb-4">
                     <ProgressRing pct={pct} color={pct >= 100 ? '#16a34a' : '#1a56db'} />
                     <div className="absolute text-center">
@@ -446,13 +453,13 @@ export const LoyaltyPublicPage = () => {
 
                   <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                     <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                    <span className="font-display font-black text-amber-800">+{pts} pts</span>
+                    <span className="font-display font-black text-amber-800">={val.toLocaleString()} FCFA</span>
                   </div>
 
                   <p className="text-[#6b7280] text-[11px] font-sans mt-3">
-                    {pts >= 1000
+                    {pts >= 10
                       ? <span className="text-[#16a34a] font-bold">🎁 {fr ? '1er cadeau atteint !' : '1st gift reached!'}</span>
-                      : fr ? `Encore ${1000 - pts} pts pour le 1er cadeau` : `${1000 - pts} pts left for 1st gift`}
+                      : fr ? `Encore ${10 - pts} pts pour le 1er cadeau` : `${10 - pts} pts left for 1st gift`}
                   </p>
                 </motion.div>
               );
@@ -613,7 +620,7 @@ export const LoyaltyPublicPage = () => {
             <div className="absolute top-8 left-[12.5%] right-[12.5%] h-px bg-white/20 hidden md:block" aria-hidden />
 
             {[
-              { n: 1, t: fr ? 'Atteignez 1 000 pts' : 'Reach 1,000 pts', d: fr ? 'Continuez à commander jusqu\'au palier.' : 'Keep ordering until the milestone.' },
+              { n: 1, t: fr ? 'Atteignez 10 pts' : 'Reach 10 pts', d: fr ? 'Dès 10 articles achetés, débloquez votre premier palier.' : 'From 10 items purchased, unlock your first milestone.' },
               { n: 2, t: fr ? 'Rendez-vous en boutique' : 'Visit the store', d: fr ? 'Douala ou Yaoundé, l\'un ou l\'autre.' : 'Douala or Yaoundé, either one.' },
               { n: 3, t: fr ? 'Donnez votre numéro' : 'Give your number', d: fr ? 'Votre numéro de téléphone d\'inscription.' : 'Your registered phone number.' },
               { n: 4, t: fr ? 'Récupérez le cadeau' : 'Pick up the gift', d: fr ? 'Remis en mains propres, immédiatement.' : 'Handed in person, immediately.' },

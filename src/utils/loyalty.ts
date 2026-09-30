@@ -4,9 +4,11 @@ import { type Order } from '../context/AppContext';
 // ─── CONFIGURATION DU PROGRAMME DE FIDÉLITÉ ─────────────────────────────────
 
 /**
- * Règle de calcul : 1 000 FCFA = 10 points (soit 1 pt pour 100 FCFA dépensés)
+ * Règle de calcul : 1 article acheté = 1 point = 10 FCFA de gain
  */
-export const POINTS_PER_FCFA = 0.01; // 10 points / 1 000 FCFA
+export const POINTS_PER_ARTICLE = 1; // 1 article acheté = 1 point
+export const FCFA_PER_POINT = 10;     // 1 point = 10 FCFA
+export const POINTS_PER_FCFA = 0.1;   // Rétrocompatibilité
 
 export interface GiftMilestone {
   id: string;
@@ -22,46 +24,46 @@ export interface GiftMilestone {
 
 export const GIFT_MILESTONES: GiftMilestone[] = [
   {
-    id: 'milestone-1000',
-    pointsRequired: 1000,
+    id: 'milestone-10',
+    pointsRequired: 10,
     titleFr: 'Cadeau Découverte Donald Gros',
     titleEn: 'Donald Gros Discovery Gift',
-    descriptionFr: 'Pack d’accessoires surprises ou bon de réduction immédiat en magasin.',
-    descriptionEn: 'Surprise accessory pack or immediate discount voucher in-store.',
-    rewardValueLabel: 'Valeur ~5 000 FCFA',
+    descriptionFr: 'Pack d’accessoires surprises ou bon d’achat immédiat en boutique dès 10 articles achetés.',
+    descriptionEn: 'Surprise accessory pack or immediate discount voucher in-store from 10 items purchased.',
+    rewardValueLabel: 'Valeur 100 FCFA + Cadeau',
     iconName: 'gift',
     badgeColor: 'from-amber-500 to-amber-700',
   },
   {
-    id: 'milestone-2500',
-    pointsRequired: 2500,
+    id: 'milestone-25',
+    pointsRequired: 25,
     titleFr: 'Cadeau Privilège Silver',
     titleEn: 'Silver Privilege Gift',
     descriptionFr: 'Article de mode de choix ou article électro au choix dans la sélection cadeaux boutique.',
     descriptionEn: 'Selected fashion item or home appliance gift choice in-store.',
-    rewardValueLabel: 'Valeur ~15 000 FCFA',
+    rewardValueLabel: 'Valeur 250 FCFA + Cadeau',
     iconName: 'trophy',
     badgeColor: 'from-slate-400 to-slate-600',
   },
   {
-    id: 'milestone-5000',
-    pointsRequired: 5000,
+    id: 'milestone-50',
+    pointsRequired: 50,
     titleFr: 'Cadeau VIP Gold Excellence',
     titleEn: 'Gold Excellence VIP Gift',
     descriptionFr: 'Pack Premium prestige (appareil électroménager ou tenue complète de marque) remis en mains propres.',
     descriptionEn: 'Prestige VIP bundle (home appliance or designer outfit) handed in person.',
-    rewardValueLabel: 'Valeur ~35 000 FCFA',
+    rewardValueLabel: 'Valeur 500 FCFA + Cadeau',
     iconName: 'crown',
     badgeColor: 'from-yellow-400 to-amber-600',
   },
   {
-    id: 'milestone-10000',
-    pointsRequired: 10000,
+    id: 'milestone-100',
+    pointsRequired: 100,
     titleFr: 'Cadeau Prestige Platine Ambassadeur',
     titleEn: 'Platinum Ambassador Prestige Gift',
     descriptionFr: 'Récompense d’exception réservée à nos plus grands clients + invitation événements VIP.',
     descriptionEn: 'Exceptional reward reserved for our top clients + VIP event invitation.',
-    rewardValueLabel: 'Valeur ~75 000 FCFA',
+    rewardValueLabel: 'Valeur 1 000 FCFA + Cadeau VIP',
     iconName: 'sparkles',
     badgeColor: 'from-purple-500 to-indigo-700',
   },
@@ -69,6 +71,7 @@ export const GIFT_MILESTONES: GiftMilestone[] = [
 
 export interface LoyaltyProfile {
   totalPoints: number;
+  totalRewardFcfa: number; // Valeur cumulée en FCFA (1 point = 10 FCFA)
   eligibleOrdersCount: number;
   tier: {
     nameFr: string;
@@ -87,11 +90,38 @@ export interface LoyaltyProfile {
 // ─── FONCTIONS DE CALCUL ────────────────────────────────────────────────────
 
 /**
- * Calcule les points gagnés pour un montant donné en FCFA
+ * Calcule les points gagnés pour une commande ou un panier.
+ * Règle : 1 article acheté = 1 point (= 10 FCFA de gain).
  */
-export function calculateOrderPoints(amount: number): number {
-  if (!amount || amount <= 0) return 0;
-  return Math.floor(amount * POINTS_PER_FCFA);
+export function calculateOrderPoints(
+  itemsOrCount?: number | { quantity?: number }[] | { items?: { quantity?: number }[] } | null
+): number {
+  if (itemsOrCount === undefined || itemsOrCount === null) return 0;
+
+  if (Array.isArray(itemsOrCount)) {
+    const totalQty = itemsOrCount.reduce((sum, item) => sum + (Number(item?.quantity) || 1), 0);
+    return Math.max(0, Math.floor(totalQty * POINTS_PER_ARTICLE));
+  }
+
+  if (typeof itemsOrCount === 'object' && 'items' in itemsOrCount && Array.isArray((itemsOrCount as any).items)) {
+    const totalQty = (itemsOrCount as any).items.reduce((sum: number, item: any) => sum + (Number(item?.quantity) || 1), 0);
+    return Math.max(0, Math.floor(totalQty * POINTS_PER_ARTICLE));
+  }
+
+  if (typeof itemsOrCount === 'number') {
+    if (itemsOrCount <= 0) return 0;
+    return Math.max(0, Math.floor(itemsOrCount * POINTS_PER_ARTICLE));
+  }
+
+  return 0;
+}
+
+/**
+ * Calcule la valeur en FCFA d'un montant de points fidélité (1 point = 10 FCFA)
+ */
+export function calculatePointsValue(points: number): number {
+  if (!points || points <= 0) return 0;
+  return Math.floor(points * FCFA_PER_POINT);
 }
 
 /**
@@ -124,10 +154,10 @@ export function isOrderEligibleForPoints(status: string): boolean {
 }
 
 /**
- * Détermine le rang VIP en fonction du solde de points
+ * Détermine le rang VIP en fonction du solde de points (1 article = 1 point)
  */
 export function getLoyaltyTier(points: number) {
-  if (points >= 10000) {
+  if (points >= 100) {
     return {
       nameFr: 'Membre Platine Ambassadeur',
       nameEn: 'Platinum Ambassador Member',
@@ -136,7 +166,7 @@ export function getLoyaltyTier(points: number) {
       gradient: 'from-purple-600 via-indigo-600 to-blue-700',
     };
   }
-  if (points >= 5000) {
+  if (points >= 50) {
     return {
       nameFr: 'Membre VIP Gold',
       nameEn: 'VIP Gold Member',
@@ -145,7 +175,7 @@ export function getLoyaltyTier(points: number) {
       gradient: 'from-amber-400 via-yellow-500 to-amber-600',
     };
   }
-  if (points >= 2500) {
+  if (points >= 25) {
     return {
       nameFr: 'Membre Silver',
       nameEn: 'Silver Member',
@@ -178,7 +208,7 @@ export function calculateLoyaltyProfile(
   if (apiOrders && apiOrders.length > 0) {
     apiOrders.forEach(ord => {
       if (isOrderEligibleForPoints(ord.status)) {
-        const pts = calculateOrderPoints(ord.totalAmount);
+        const pts = calculateOrderPoints(ord.items && ord.items.length > 0 ? ord.items : 1);
         totalPoints += pts;
         eligibleOrdersCount += 1;
         orderPointsMap[String(ord.id)] = pts;
@@ -188,7 +218,7 @@ export function calculateLoyaltyProfile(
   } else if (localOrders && localOrders.length > 0) {
     localOrders.forEach(ord => {
       if (isOrderEligibleForPoints(ord.status)) {
-        const pts = calculateOrderPoints(ord.total);
+        const pts = calculateOrderPoints(ord.items && ord.items.length > 0 ? ord.items : 1);
         totalPoints += pts;
         eligibleOrdersCount += 1;
         orderPointsMap[String(ord.id)] = pts;
@@ -215,9 +245,11 @@ export function calculateLoyaltyProfile(
   }
 
   const tier = getLoyaltyTier(totalPoints);
+  const totalRewardFcfa = calculatePointsValue(totalPoints);
 
   return {
     totalPoints,
+    totalRewardFcfa,
     eligibleOrdersCount,
     tier,
     nextMilestone,

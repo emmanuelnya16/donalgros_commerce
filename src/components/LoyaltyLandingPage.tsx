@@ -6,7 +6,7 @@ import {
   Zap, Shield, TrendingUp, Award
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { GIFT_MILESTONES, calculateOrderPoints } from '../utils/loyalty';
+import { GIFT_MILESTONES, calculateOrderPoints, calculatePointsValue } from '../utils/loyalty';
 
 // ─── Composant Compteur animé ────────────────────────────────────────────────
 const AnimatedCounter = ({ target, suffix = '' }: { target: number; suffix?: string }) => {
@@ -105,7 +105,7 @@ export const LoyaltyLandingPage = () => {
     {
       name: 'Bronze', range: fr ? '0 – 2 499 pts' : '0 – 2,499 pts',
       gradient: 'from-amber-700 via-orange-700 to-amber-900', emoji: '🥉',
-      perks: fr ? ['Accès au programme', 'Cadeaux dès 1 000 pts', 'Badge membre Donald Gros'] : ['Program access', 'Gifts from 1,000 pts', 'Donald Gros member badge'],
+      perks: fr ? ['Accès au programme', 'Cadeaux dès 10 pts', 'Badge membre Donald Gros'] : ['Program access', 'Gifts from 10 pts', 'Donald Gros member badge'],
     },
     {
       name: 'Silver', range: fr ? '2 500 – 4 999 pts' : '2,500 – 4,999 pts',
@@ -118,17 +118,17 @@ export const LoyaltyLandingPage = () => {
       perks: fr ? ['Cadeau VIP Gold', 'Invitation événements exclusifs', 'Service prioritaire'] : ['VIP Gold Gift', 'Exclusive event invites', 'Priority service'],
     },
     {
-      name: 'Platine', range: '10 000+ pts',
+      name: 'Platine', range: '100+ pts',
       gradient: 'from-purple-600 via-indigo-600 to-blue-700', emoji: '💎',
       perks: fr ? ['Cadeau Platine Ambassadeur', 'Avantages VIP maximum', 'Accès offres exclusives'] : ['Platinum Ambassador Gift', 'Maximum VIP benefits', 'Exclusive offer access'],
     },
   ];
 
   const exampleOrders = [
-    { amount: 10000, label: fr ? 'Paire de chaussures' : 'Pair of shoes' },
-    { amount: 25000, label: fr ? 'Article de mode' : 'Fashion item' },
-    { amount: 50000, label: fr ? 'Électroménager' : 'Appliance' },
-    { amount: 100000, label: fr ? 'Gros appareil' : 'Large appliance' },
+    { items: 1, label: fr ? '1 Article (ex: T-shirt)' : '1 Item (e.g. T-shirt)' },
+    { items: 5, label: fr ? '5 Articles (ex: Panier mode)' : '5 Items (e.g. Fashion cart)' },
+    { items: 10, label: fr ? '10 Articles (1er cadeau !)' : '10 Items (1st gift!)' },
+    { items: 25, label: fr ? '25 Articles (Statut Silver)' : '25 Items (Silver Tier)' },
   ];
 
   const steps = [
@@ -142,7 +142,7 @@ export const LoyaltyLandingPage = () => {
       icon: <Zap className="w-8 h-8" />,
       color: 'bg-amber-500 text-white',
       title: fr ? 'Accumulez vos points' : 'Accumulate points',
-      desc: fr ? 'La règle est simple : pour chaque 1 000 FCFA dépensés, vous recevez 10 points fidélité. Ils s\'accumulent sur toutes vos commandes.' : 'Simple rule: for every 1,000 FCFA spent, you receive 10 loyalty points. They stack across all your orders.',
+      desc: fr ? 'La règle est simple : 1 article acheté = 1 point fidélité = 10 FCFA de gain. Ils s\'accumulent sur toutes vos commandes.' : 'Simple rule: 1 item purchased = 1 loyalty point = 10 FCFA reward. They stack across all your orders.',
     },
     {
       icon: <TrendingUp className="w-8 h-8" />,
@@ -154,7 +154,7 @@ export const LoyaltyLandingPage = () => {
       icon: <Store className="w-8 h-8" />,
       color: 'bg-purple-600 text-white',
       title: fr ? 'Récupérez votre cadeau en boutique' : 'Collect your gift in-store',
-      desc: fr ? 'Dès 1 000 points atteints, rendez-vous dans notre boutique physique à Douala ou Yaoundé et présentez votre numéro de compte pour retirer votre cadeau !' : 'Once you reach 1,000 points, visit our physical store in Douala or Yaoundé and show your account number to collect your gift!',
+      desc: fr ? 'Dès 10 points atteints, rendez-vous dans notre boutique physique à Douala ou Yaoundé et présentez votre numéro de compte pour retirer votre cadeau !' : 'Once you reach 10 points, visit our physical store in Douala or Yaoundé and show your account number to collect your gift!',
     },
   ];
 
@@ -300,7 +300,7 @@ export const LoyaltyLandingPage = () => {
                   {/* Barre de progression */}
                   <div className="mb-6">
                     <div className="flex justify-between text-xs text-white/50 mb-2">
-                      <span>750 / 1 000 pts</span>
+                      <span>7 / 10 pts</span>
                       <span>75%</span>
                     </div>
                     <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
@@ -316,7 +316,7 @@ export const LoyaltyLandingPage = () => {
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { icon: '🛍️', label: fr ? '5 Commandes' : '5 Orders', sub: fr ? 'récompensées' : 'rewarded' },
-                      { icon: '🎁', label: fr ? '1 Cadeau' : '1 Gift', sub: fr ? 'disponible à 1 000 pts' : 'at 1,000 pts' },
+                      { icon: '🎁', label: fr ? '1 Cadeau' : '1 Gift', sub: fr ? 'disponible à 10 pts' : 'at 10 pts' },
                     ].map((s, i) => (
                       <div key={i} className="bg-white/10 rounded-2xl p-4 border border-white/10 text-center">
                         <p className="text-2xl mb-1">{s.icon}</p>
@@ -423,8 +423,9 @@ export const LoyaltyLandingPage = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {exampleOrders.map((ex, i) => {
-              const pts = calculateOrderPoints(ex.amount);
-              const toNext = pts >= 1000 ? 0 : 1000 - pts;
+              const pts = calculateOrderPoints(ex.items);
+              const val = calculatePointsValue(pts);
+              const toNext = pts >= 10 ? 0 : 10 - pts;
               return (
                 <motion.div
                   key={i}
@@ -436,7 +437,7 @@ export const LoyaltyLandingPage = () => {
                 >
                   <p className="text-sm text-medium-gray font-bold uppercase tracking-wide mb-3">{ex.label}</p>
                   <p className="text-3xl font-display font-black text-dark-gray mb-1">
-                    {ex.amount.toLocaleString()} FCFA
+                    +{pts} <span className="text-lg font-bold text-medium-gray">pts</span>
                   </p>
                   <div className="my-4 flex items-center justify-center">
                     <div className="h-px flex-1 bg-light-gray" />
@@ -445,7 +446,7 @@ export const LoyaltyLandingPage = () => {
                   </div>
                   <div className="inline-flex items-center gap-2 px-5 py-3 bg-amber-50 border border-amber-200 rounded-2xl">
                     <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                    <span className="text-2xl font-display font-black text-amber-800">+{pts} pts</span>
+                    <span className="text-xl font-display font-black text-amber-800">={val.toLocaleString()} FCFA</span>
                   </div>
                   {toNext > 0 ? (
                     <p className="text-xs text-medium-gray mt-3">
@@ -475,12 +476,12 @@ export const LoyaltyLandingPage = () => {
               </h3>
               <p className="text-white/70 text-sm">
                 {fr
-                  ? 'Points gagnés = (Montant de votre commande en FCFA) × 0,01 — autrement dit : chaque tranche de 1 000 FCFA = 10 points.'
-                  : 'Points earned = (Order amount in FCFA) × 0.01 — in other words: every 1,000 FCFA = 10 points.'}
+                  ? '1 article acheté = 1 point fidélité = 10 FCFA de gain. Achetez 10 articles, gagnez 10 points (soit 100 FCFA de valeur) et débloquez votre 1er cadeau !'
+                  : '1 item purchased = 1 loyalty point = 10 FCFA reward. Buy 10 items, get 10 points (worth 100 FCFA) and unlock your 1st gift!'}
               </p>
             </div>
             <div className="bg-amber-500 text-slate-950 font-black px-6 py-3 rounded-2xl whitespace-nowrap text-sm shrink-0">
-              1 000 FCFA = 10 pts ⭐
+              1 article = 1 pt = 10 FCFA ⭐
             </div>
           </motion.div>
         </div>
@@ -605,7 +606,7 @@ export const LoyaltyLandingPage = () => {
               className="space-y-4"
             >
               {[
-                { n: 1, t: fr ? 'Atteignez 1 000 points' : 'Reach 1,000 points', d: fr ? 'Commandez sur le site jusqu\'à atteindre votre premier palier.' : 'Order on the site until you reach your first milestone.' },
+                { n: 1, t: fr ? 'Atteignez 10 points' : 'Reach 10 points', d: fr ? 'Dès 10 articles achetés, débloquez votre premier palier cadeau.' : 'From 10 items purchased, unlock your first gift milestone.' },
                 { n: 2, t: fr ? 'Rendez-vous en boutique' : 'Visit the store', d: fr ? 'Venez dans nos boutiques à Douala ou Yaoundé avec votre téléphone.' : 'Come to our stores in Douala or Yaoundé with your phone.' },
                 { n: 3, t: fr ? 'Présentez votre numéro' : 'Show your number', d: fr ? 'Donnez votre numéro de téléphone d\'inscription à notre équipe.' : 'Give your registered phone number to our team.' },
                 { n: 4, t: fr ? 'Récupérez votre cadeau ! 🎉' : 'Collect your gift! 🎉', d: fr ? 'Notre équipe vérifie votre solde et vous remet votre cadeau sur le champ.' : 'Our team checks your balance and hands you your gift right away.' },

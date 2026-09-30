@@ -87,7 +87,8 @@ export const AdminAnalytics = () => {
       const result = await fetchAnalytics(startDate);
       setData(result);
     } catch (e: any) {
-      setError(e.message || 'Erreur lors du chargement des données analytics');
+      const serverMsg = e.response?.data?.message || e.response?.data?.detail;
+      setError(serverMsg || e.message || 'Erreur lors du chargement des données analytics');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -117,10 +118,11 @@ export const AdminAnalytics = () => {
         </div>
         <div className="text-center max-w-md">
           <h3 className="font-black text-lg text-gray-800 mb-2">Données non disponibles</h3>
-          <p className="text-sm text-gray-500 mb-1">{error}</p>
+          <p className="text-sm text-red-600 font-medium mb-1 break-words">{error}</p>
           <p className="text-xs text-gray-400 mb-6">
-            Vérifiez que le backend Symfony est configuré avec le fichier de clé JSON
-            et que l'endpoint <code className="bg-gray-100 px-1 rounded">/admin/analytics</code> est actif.
+            Vérifiez que le backend Symfony distant possède la clé <code className="bg-gray-100 px-1 rounded">config/analytics-credentials.json</code>,
+            la variable <code className="bg-gray-100 px-1 rounded">GA4_PROPERTY_ID</code> dans son <code className="bg-gray-100 px-1 rounded">.env</code>,
+            et que l'endpoint <code className="bg-gray-100 px-1 rounded">/api/admin/analytics</code> est déployé.
           </p>
           <button
             onClick={handleRefresh}
