@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -17,6 +17,7 @@ import { translations } from './translations';
 import { PageLoader, SkeletonSection, SkeletonCategoryRow } from './components/LoadingComponents';
 import { getNewArrivals, getBestSellers, getOnSaleProducts } from './services/catalogueService';
 import { retryWithBackoff } from './services/api';
+import { trackPageView } from './services/trackingService';
 import { calculateOrderPoints, calculatePointsValue } from './utils/loyalty';
 
 // ─── Lazy-loaded heavy page components ───
@@ -329,6 +330,8 @@ function AppContent() {
     window.addEventListener('scroll', handleScroll);
     // Envoyer le pageview de la page initiale
     ReactGA.send({ hitType: 'pageview', page: '/' + (route || 'home') });
+    // 🏠 Tracker maison : enregistre la visite initiale en base
+    trackPageView('/' + (route || 'home'), document.referrer);
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('scroll', handleScroll);
@@ -445,4 +448,5 @@ export default function App() {
     </AppProvider>
   );
 }
+
 
